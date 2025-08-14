@@ -1,0 +1,38 @@
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Virtual environment
+.env/
+venv/
+env/
+
+# Database files
+db.sqlite3
+
+# Media and static files (if not managed by a separate service)
+media/
+static_collected/ # Or whatever your COLLECTSTATIC output directory is
+
+# Local settings (if separate from version-controlled settings)
+local_settings.py
+
+# IDE-specific files (e.g., PyCharm, VS Code)
+.idea/
+.vscode/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Test coverage files
+.coverage
+.tox/
+
+# Other temporary or generated files
+*.pot
+*.egg-info/
+.eggs/
