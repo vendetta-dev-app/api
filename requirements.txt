@@ -1,0 +1,9 @@
+Django==5.2.3
+django-cors-headers==4.7.0
+django-extensions==4.1
+django-graphql-jwt==0.4.0
+graphene-django==3.2.3
+graphene==3.4.3
+ipython==9.4.0
+django-cities-light==3.10.1
+django-filter==25.1
