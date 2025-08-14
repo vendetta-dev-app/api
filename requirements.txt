@@ -7,3 +7,4 @@ graphene==3.4.3
 ipython==9.4.0
 django-cities-light==3.10.1
 django-filter==25.1
+psycopg2-binary==2.9.10
