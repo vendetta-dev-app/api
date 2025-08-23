@@ -28,6 +28,10 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+if os.environ.get("CSRF_TRUSTED_ORIGINS", None):
+    CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(
+        ",")
+
 # Application definition
 
 INSTALLED_APPS = [
