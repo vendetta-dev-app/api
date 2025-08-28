@@ -1,7 +1,7 @@
-from django.contrib.auth.decorators import login_required
 from graphene import relay, Field, String
 from graphql import GraphQLError
 from django.db import transaction
+from graphql_jwt.decorators import login_required
 
 from accounts.constants import roles
 from accounts.models import InvitationCode, User, AdminProfile, CollectorProfile
