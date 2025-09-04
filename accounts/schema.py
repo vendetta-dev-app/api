@@ -4,7 +4,7 @@ from graphql import GraphQLError
 from graphql_jwt import ObtainJSONWebToken, Verify, Refresh
 from graphql_jwt.decorators import login_required
 
-from accounts.mutations import CreateAdmin, CreateCollector, CreateClient
+from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, EditCollector
 from accounts.nodes import UserNode, CollectorNode
 
 
@@ -19,7 +19,7 @@ class Query(ObjectType):
     @login_required
     def resolve_collectors_by_admin(self, info):
         user = info.context.user
-        print(user)
+
         if not user.is_admin:
             raise GraphQLError("You are not an admin.")
 
@@ -33,4 +33,5 @@ class Mutation(ObjectType):
 
     create_admin = CreateAdmin.Field()
     create_collector = CreateCollector.Field()
+    edit_collector = EditCollector.Field()
     create_client = CreateClient.Field()

@@ -1,11 +1,10 @@
-from graphene import relay, Field, String
+from graphene import relay, Field, String, Boolean
 from graphql import GraphQLError
-from django.db import transaction
 from graphql_jwt.decorators import login_required
+from graphql_relay import from_global_id
 
-from accounts.constants import roles
-from accounts.models import InvitationCode, User, AdminProfile, CollectorProfile
-from accounts.nodes import UserNode
+from accounts.models import InvitationCode, User, CollectorProfile
+from accounts.nodes import UserNode, CollectorNode
 
 
 class BaseUserInput:
@@ -52,7 +51,7 @@ class CreateAdmin(relay.ClientIDMutation):
 
 
 class CreateCollector(relay.ClientIDMutation):
-    user = Field(UserNode)
+    collector = Field(CollectorNode)
 
     class Input(BaseUserInput):
         password = String(required=True)
@@ -64,9 +63,6 @@ class CreateCollector(relay.ClientIDMutation):
 
         if not admin.is_admin:
             raise GraphQLError('Solo los administradores pueden crear cobradores')
-
-        if not hasattr(admin, 'admin_profile'):
-            raise GraphQLError('Este administrador no tiene perfil asociado')
 
         email = input.get('email')
 
@@ -86,7 +82,44 @@ class CreateCollector(relay.ClientIDMutation):
         except Exception as e:
             raise GraphQLError(f'Error creando cobrador: {str(e)}')
 
-        return CreateCollector(user=user)
+        return CreateCollector(collector=user.collector_profile)
+
+
+class EditCollector(relay.ClientIDMutation):
+    user = Field(UserNode)
+
+    class Input(BaseUserInput):
+        user_id = String(required=True)
+        is_active = Boolean(required=True)
+
+    @classmethod
+    @login_required
+    def mutate_and_get_payload(cls, root, info, **input):
+        user_id = input.pop("user_id")
+        print(input)
+        try:
+            user_id = from_global_id(user_id)[1]
+        except Exception as e:
+            raise GraphQLError(f"Error editar cobrador: {str(e)}")
+
+        try:
+            user = User.objects.get(id=user_id)
+        except CollectorProfile.DoesNotExist:
+            raise GraphQLError("No existe un usuario con este id")
+
+        if not user.is_collector:
+            raise GraphQLError("No existe un perfil de cobrador para este usuario")
+
+        for field, value in input.items():
+            if field == 'is_active':
+                setattr(user.collector_profile, field, value)
+            if hasattr(user, field):
+                setattr(user, field, value)
+
+        user.save()
+        user.collector_profile.save()
+
+        return EditCollector(user=user)
 
 
 class CreateClient(relay.ClientIDMutation):

@@ -84,6 +84,8 @@ class ClientProfile(ProfileBase):
         related_name='clients'
     )
 
+    is_active = models.BooleanField(default=False)
+
     class Meta:
         default_related_name = "client_profile"
 
@@ -94,6 +96,7 @@ class CollectorProfile(ProfileBase):
         on_delete=models.PROTECT,
         related_name='collectors'
     )
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         default_related_name = "collector_profile"
