@@ -11,4 +11,6 @@ class CollectorProfileFilterset(FilterSet):
 
     class Meta:
         model = CollectorProfile
-        fields = []
+        fields = {
+            "is_active": ["exact"],
+        }
