@@ -1,4 +1,6 @@
-from graphene import ClientIDMutation, Field, String
+from django.db import transaction
+from graphene import ClientIDMutation
+from graphene import relay, Field, String, Decimal
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
@@ -8,44 +10,53 @@ from routes.models import Route
 from routes.nodes import RouteNode
 
 
-class CreateRoute(ClientIDMutation):
+class CreateRoute(relay.ClientIDMutation):
     route = Field(RouteNode)
 
     class Input:
         name = String(required=True)
         city_id = String(required=True)
         collector_id = String(required=False)
+        initial_value = Decimal(required=True)
 
     @classmethod
     @login_required
     def mutate_and_get_payload(cls, root, info, **input):
         user = info.context.user
+        initial_value = input.pop('initial_value')
 
         if not user.is_admin:
-            raise GraphQLError('No tienes persmisos para realizar esta acción')
+            raise GraphQLError('No tienes permisos para realizar esta acción')
 
         try:
             city_id = from_global_id(input.pop('city_id'))[1]
         except Exception:
-            raise GraphQLError("El id de la ciudad no es valido")
+            raise GraphQLError("El id de la ciudad no es válido")
 
-        try:
-            colletor_id = from_global_id(input.pop('collector_id'))[1]
-        except Exception:
-            raise GraphQLError("El id del cobrador no es valido")
-
+        collector_id = None
+        if input.get('collector_id'):
+            try:
+                collector_id = from_global_id(input.pop('collector_id'))[1]
+            except Exception:
+                raise GraphQLError("El id del cobrador no es válido")
 
         admin_profile = user.admin_profile
 
-        route = Route.objects.create(
-            name = input.get('name'),
-            city_id = city_id,
-            collector_id = colletor_id,
-            administrators = admin_profile,
-        )
+        with transaction.atomic():
+            route = Route.objects.create(
+                name=input.get('name'),
+                city_id=city_id,
+                collector_id=collector_id,
+            )
+            route.administrators.set([admin_profile])
+
+            if initial_value:
+                route.set_starting_balance(
+                    initial_value,
+                    description=f"Initial value for route '{route.name}'"
+                )
 
         return CreateRoute(route=route)
-
 
 
 class ChangeRouteCollector(ClientIDMutation):
@@ -54,7 +65,6 @@ class ChangeRouteCollector(ClientIDMutation):
     class Input:
         collector_id = String(required=True)
         route_id = String(required=True)
-
 
     @classmethod
     @login_required

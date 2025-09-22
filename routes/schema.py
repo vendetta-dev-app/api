@@ -22,7 +22,7 @@ class Query(ObjectType):
         if not user.is_admin:
             raise GraphQLError('You are not an admin.')
 
-        return Route.objects.filter(administrators=user.adminprofile)
+        return Route.objects.filter(administrators=user.admin_profile)
 
     @login_required
     def resolve_routes_by_collector(self, info, **kwargs):

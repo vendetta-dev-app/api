@@ -1,7 +1,7 @@
-from django.db.models.deletion import Collector
-from graphene_django import DjangoObjectType
 from graphene import relay
+from graphene_django import DjangoObjectType
 
+from accounts.filtersets import CollectorProfileFilterset
 from accounts.models import User, AdminProfile, CollectorProfile, ClientProfile
 from snipets.graphql.connection import CountableConnection
 
@@ -23,7 +23,7 @@ class AdminNode(DjangoObjectType):
 class CollectorNode(DjangoObjectType):
     class Meta:
         model = CollectorProfile
-        filter_fields = []
+        filterset_class = CollectorProfileFilterset
         interfaces = (relay.Node,)
         connection_class = CountableConnection
 

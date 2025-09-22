@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     # Custom Apps
     'accounts.apps.AccountsConfig',
     'routes.apps.RoutesConfig',
+    'transactions.apps.TransactionsConfig',
 ]
 
 MIDDLEWARE = [
