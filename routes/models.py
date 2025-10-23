@@ -1,8 +1,10 @@
 from decimal import Decimal
 
 from cities_light.models import City
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models import Sum
 
 from transactions.models import Transaction
 from transactions.constants import transaction_types
@@ -41,10 +43,11 @@ class Route(models.Model):
         Create or update the route_initial transaction for this route.
         Enforces the 'only one starting balance per route' rule.
         """
-        tx, created = Transaction.objects.update_or_create(
+        tx = Transaction.objects.create(
             related_object=self,
             transaction_type=transaction_types.ROUTE_INITIAL,
-            defaults={"amount": amount, "description": description},
+            amount=amount,
+            description=description
         )
         return tx
 
@@ -63,3 +66,24 @@ class Route(models.Model):
             .first()
         )
         return tx_amount or Decimal("0.00")
+
+    @property
+    def current_balance(self):
+        """
+        Calcula el saldo actual de la ruta:
+        starting_balance - préstamos + pagos de préstamos
+        """
+        qs = Transaction.objects.filter(
+            content_type=ContentType.objects.get_for_model(Route),
+            object_id=self.id
+        )
+
+        loans_total = qs.filter(
+            transaction_type=transaction_types.LOAN_DISBURSEMENT
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+        loan_payments_total = qs.filter(
+            transaction_type=transaction_types.LOAN_PAYMENT
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+        return self.starting_balance - loans_total + loan_payments_total
