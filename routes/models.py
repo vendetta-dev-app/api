@@ -32,6 +32,14 @@ class Route(models.Model):
         related_name='routes_as_admin'
     )
 
+    manager = models.ForeignKey(
+        'accounts.ManagerProfile',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='routes_as_manager'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

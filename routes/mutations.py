@@ -5,7 +5,7 @@ from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
 
-from accounts.models import CollectorProfile
+from accounts.models import CollectorProfile, ManagerProfile
 from routes.models import Route
 from routes.nodes import RouteNode
 
@@ -16,7 +16,8 @@ class CreateRoute(relay.ClientIDMutation):
     class Input:
         name = String(required=True)
         city_id = String(required=True)
-        collector_id = String(required=False)
+        collector_id = String(required=True)
+        manager_id = String(required=True)
         initial_value = Decimal(required=True)
 
     @classmethod
@@ -33,12 +34,15 @@ class CreateRoute(relay.ClientIDMutation):
         except Exception:
             raise GraphQLError("El id de la ciudad no es válido")
 
-        collector_id = None
-        if input.get('collector_id'):
-            try:
-                collector_id = from_global_id(input.pop('collector_id'))[1]
-            except Exception:
-                raise GraphQLError("El id del cobrador no es válido")
+        try:
+            collector_id = from_global_id(input.pop('collector_id'))[1]
+        except Exception:
+            raise GraphQLError("El id del cobrador no es válido")
+
+        try:
+            manager_id = from_global_id(input.pop('manager_id'))[1]
+        except Exception:
+            raise GraphQLError("el id del manager no es valido")
 
         admin_profile = user.admin_profile
 
@@ -47,6 +51,7 @@ class CreateRoute(relay.ClientIDMutation):
                 name=input.get('name'),
                 city_id=city_id,
                 collector_id=collector_id,
+                manager_id=manager_id,
             )
             route.administrators.set([admin_profile])
 
@@ -59,12 +64,13 @@ class CreateRoute(relay.ClientIDMutation):
         return CreateRoute(route=route)
 
 
-class ChangeRouteCollector(ClientIDMutation):
+class EditRoute(ClientIDMutation):
     route = Field(RouteNode)
 
     class Input:
-        collector_id = String(required=True)
         route_id = String(required=True)
+        collector_id = String(required=True)
+        manager_id = String(required=True)
 
     @classmethod
     @login_required
@@ -85,6 +91,11 @@ class ChangeRouteCollector(ClientIDMutation):
             raise GraphQLError("El id del cobrador no es valido")
 
         try:
+            manager_id = from_global_id(input.pop('manager_id'))[1]
+        except Exception:
+            raise GraphQLError("el id del manager no es valido")
+
+        try:
             route = Route.objects.get(id=route_id)
         except Route.DoesNotExist:
             raise GraphQLError("No existe una ruta con este id")
@@ -94,10 +105,13 @@ class ChangeRouteCollector(ClientIDMutation):
         except CollectorProfile.DoesNotExist:
             raise GraphQLError("No existe un cobrador con este id")
 
-        if route.collector == collector:
-            return ChangeRouteCollector(route=route)
+        try:
+            manager = ManagerProfile.objects.get(id=manager_id)
+        except ManagerProfile.DoesNotExist:
+            raise GraphQLError("No existe un cobrador con este id")
 
         route.collector = collector
+        route.manager = manager
         route.save()
 
-        return ChangeRouteCollector(route=route)
+        return EditRoute(route=route)
