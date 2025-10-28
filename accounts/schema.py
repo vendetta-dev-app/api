@@ -4,16 +4,18 @@ from graphql import GraphQLError
 from graphql_jwt import ObtainJSONWebToken, Verify, Refresh
 from graphql_jwt.decorators import login_required
 
-from accounts.filtersets import CollectorProfileFilterset
-from accounts.models import CollectorProfile
-from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, EditCollector
-from accounts.nodes import UserNode, CollectorNode
+from accounts.filtersets import CollectorProfileFilterset, ManagerProfileFilterset
+from accounts.models import CollectorProfile, ManagerProfile
+from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, EditCollector, CreateManager
+from accounts.nodes import UserNode, CollectorNode, ManagerNode
 
 
 class Query(ObjectType):
     me = Field(UserNode)
 
     collectors_by_admin = DjangoFilterConnectionField(CollectorNode)
+
+    managers_by_admin = DjangoFilterConnectionField(ManagerNode)
 
     def resolve_me(self, info):
         return info.context.user
@@ -32,6 +34,19 @@ class Query(ObjectType):
         filterset = CollectorProfileFilterset(data=kwargs, queryset=qs, request=info.context)
         return filterset.qs
 
+    @login_required
+    def resolve_managers_by_admin(self, info, **kwargs):
+        user = info.context.user
+
+        if not user.is_admin:
+            raise GraphQLError("You are not an admin.")
+
+        qs = ManagerProfile.objects.filter(admin=user.admin_profile)
+
+        filterset = ManagerProfileFilterset(data=kwargs, queryset=qs, request=info.context)
+
+        return filterset.qs
+
 
 class Mutation(ObjectType):
     token_auth = ObtainJSONWebToken.Field()
@@ -39,6 +54,7 @@ class Mutation(ObjectType):
     refresh_token = Refresh.Field()
 
     create_admin = CreateAdmin.Field()
+    create_manager = CreateManager.Field()
     create_collector = CreateCollector.Field()
     edit_collector = EditCollector.Field()
     create_client = CreateClient.Field()

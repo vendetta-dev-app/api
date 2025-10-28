@@ -6,6 +6,7 @@ from routes.models import Route
 
 class RouteNode(DjangoObjectType):
     starting_balance = Decimal()
+    current_balance = Decimal()
 
     class Meta:
         model = Route

@@ -2,7 +2,7 @@ from graphene import relay
 from graphene_django import DjangoObjectType
 
 from accounts.filtersets import CollectorProfileFilterset
-from accounts.models import User, AdminProfile, CollectorProfile, ClientProfile
+from accounts.models import User, AdminProfile, CollectorProfile, ClientProfile, ManagerProfile
 from snipets.graphql.connection import CountableConnection
 
 
@@ -16,6 +16,13 @@ class UserNode(DjangoObjectType):
 class AdminNode(DjangoObjectType):
     class Meta:
         model = AdminProfile
+        filter_fields = []
+        interfaces = (relay.Node,)
+
+
+class ManagerNode(DjangoObjectType):
+    class Meta:
+        model = ManagerProfile
         filter_fields = []
         interfaces = (relay.Node,)
 

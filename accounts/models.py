@@ -102,6 +102,22 @@ class CollectorProfile(ProfileBase):
         default_related_name = "collector_profile"
 
 
+class ManagerProfile(ProfileBase):
+    admin = models.ForeignKey(
+        'AdminProfile',
+        on_delete=models.PROTECT,
+        related_name='managers'
+    )
+
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        default_related_name = "manager_profile"
+
+    def __str__(self):
+        return f"{self.user.full_name} - {self.id}"
+
+
 class AdminProfile(ProfileBase):
     class Meta:
         default_related_name = "admin_profile"

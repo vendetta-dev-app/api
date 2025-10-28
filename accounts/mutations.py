@@ -4,7 +4,7 @@ from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
 
 from accounts.models import InvitationCode, User, CollectorProfile
-from accounts.nodes import UserNode, CollectorNode
+from accounts.nodes import UserNode, CollectorNode, ManagerNode
 
 
 class BaseUserInput:
@@ -48,6 +48,40 @@ class CreateAdmin(relay.ClientIDMutation):
             raise GraphQLError(f'Error creando admin: {str(e)}')
 
         return CreateAdmin(user=user)
+
+
+class CreateManager(relay.ClientIDMutation):
+    manager = Field(ManagerNode)
+
+    class Input(BaseUserInput):
+        password = String(required=True)
+
+    @classmethod
+    def mutate_and_get_payload(cls, root, info, **input):
+        admin = info.context.user
+
+        if not admin.is_admin:
+            raise GraphQLError('Solo los administradores pueden crear cobradores')
+
+        email = input.get('email')
+
+        if User.objects.filter(email=email).exists():
+            raise GraphQLError('Ya existe un usuario con este correo')
+
+        try:
+            user = User.objects.create_manager(
+                admin_profile=admin.admin_profile,
+                email=email,
+                password=input.get('password'),
+                full_name=input.get('full_name'),
+                phone_number_1=input.get('phone_number_1'),
+                phone_number_2=input.get('phone_number_2'),
+            )
+        except Exception as e:
+            raise GraphQLError(f'Error creando manager: {str(e)}')
+
+        return CreateManager(manager=user.manager_profile)
+
 
 
 class CreateCollector(relay.ClientIDMutation):

@@ -72,6 +72,23 @@ class UserManager(BaseUserManager):
             AdminProfile.objects.create(user=user)
         return user
 
+    def create_manager(self, admin_profile, email, password=None, **extra_fields):
+        from accounts.models import ManagerProfile
+
+        if not admin_profile:
+            raise ValueError("Debe proporcionar un perfil de administrador")
+
+        with transaction.atomic():
+            user = self.create_user(
+                email=email,
+                password=password,
+                role=roles.COLLECTOR,
+                **extra_fields
+            )
+            ManagerProfile.objects.create(user=user, admin=admin_profile)
+
+        return user
+
     def create_collector(self, admin_profile, email, password=None, **extra_fields):
         from accounts.models import CollectorProfile
 

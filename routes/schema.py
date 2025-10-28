@@ -1,4 +1,4 @@
-from graphene import ObjectType
+from graphene import ObjectType, relay
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
@@ -15,9 +15,13 @@ class Query(ObjectType):
     # Query to get routes where the logged-in user is a collector
     routes_by_collector = DjangoFilterConnectionField(RouteNode)
 
+    # TODO add validation for validate user and return just routes related to user
+    route = relay.Node.Field(RouteNode)
+
     @login_required
     def resolve_routes_by_admin(self, info, **kwargs):
         user = info.context.user
+        print(user)
 
         if not user.is_admin:
             raise GraphQLError('You are not an admin.')
