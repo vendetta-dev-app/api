@@ -3,12 +3,13 @@ from graphene import ObjectType, Schema
 import accounts.schema
 import routes.schema
 import cities.schema
-
+import transactions.schema
 
 class Query(
     accounts.schema.Query,
     cities.schema.Query,
     routes.schema.Query,
+    transactions.schema.Query,
     ObjectType):
     pass
 

@@ -26,6 +26,13 @@ class Route(models.Model):
         related_name='routes_as_collector'
     )
 
+    transactions = GenericRelation(
+        Transaction,
+        content_type_field='content_type',
+        object_id_field='object_id',
+        related_query_name='route'
+    )
+
     # Multiple administrators per route, and each administrator can have multiple routes
     administrators = models.ManyToManyField(
         'accounts.AdminProfile',

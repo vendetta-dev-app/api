@@ -6,4 +6,6 @@ TRANSACTION_TYPES_CHOICES = (
     (transaction_types.LOAN_DISBURSEMENT, "Loan disbursement"),
     (transaction_types.LOAN_PAYMENT, "Loan payment"),
     (transaction_types.ADJUSTMENT, "Adjustment"),
+    (transaction_types.EXPENSE, "Expense"),
+    (transaction_types.CASH_OUT, "Cash out"),
 )

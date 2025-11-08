@@ -202,3 +202,58 @@ class CreateClient(relay.ClientIDMutation):
             raise GraphQLError(f'Error creando cliente: {str(e)}')
 
         return CreateClient(user=user)
+
+
+class UpdateClient(relay.ClientIDMutation):
+    user = Field(UserNode)
+
+    class Input(BaseUserInput):
+        id = String(required=True)  # Client global ID
+        alias = String(required=False)
+        phone_number_1 = String(required=False)
+        phone_number_2 = String(required=False)
+        address_line_1 = String(required=False)
+        address_line_2 = String(required=False)
+        neighborhood = String(required=False)
+        full_name = String(required=False)
+
+    @classmethod
+    @login_required
+    def mutate_and_get_payload(cls, root, info, **input):
+        collector = info.context.user
+
+        if not collector.is_collector:
+            raise GraphQLError("Solo los cobradores pueden actualizar clientes")
+
+        if not hasattr(collector, "collector_profile"):
+            raise GraphQLError("Este cobrador no tiene perfil asociado")
+
+        # Decode Relay global ID to get the database ID
+        try:
+            client_id = from_global_id(input.get("id"))[1]
+            client = User.objects.get(id=client_id, collector_profile=collector.collector_profile)
+        except User.DoesNotExist:
+            raise GraphQLError("Cliente no encontrado o no pertenece a este cobrador")
+
+        # Update allowed fields
+        updatable_fields = [
+            "alias",
+            "phone_number_1",
+            "phone_number_2",
+            "address_line_1",
+            "address_line_2",
+            "neighborhood",
+            "full_name",
+        ]
+
+        for field in updatable_fields:
+            value = input.get(field)
+            if value is not None:
+                setattr(client, field, value)
+
+        try:
+            client.save()
+        except Exception as e:
+            raise GraphQLError(f"Error actualizando cliente: {str(e)}")
+
+        return UpdateClient(user=client.user)
