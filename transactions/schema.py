@@ -15,7 +15,6 @@ class Query(ObjectType):
 
     transactions_by_route = DjangoFilterConnectionField(
         TransactionNode,
-        route_id=String(required=True),
     )
 
     @login_required
@@ -47,7 +46,7 @@ class Query(ObjectType):
         return filterset.qs
 
     @login_required
-    def resolve_transactions_by_route(self, info, route_id, **kwargs):
+    def resolve_transactions_by_route(self, info, route, **kwargs):
         user = info.context.user
 
         admin_profile = getattr(user, "adminprofile", None)
@@ -56,12 +55,12 @@ class Query(ObjectType):
             raise Exception("No tienes permiso para consultar esta informacion")
 
         try:
-            route_pk = from_global_id(route_id)[1]
+            route_pk = from_global_id(route)[1]
             route = Route.objects.get(pk=route_pk)
         except Exception:
-            raise Exception(f"Error al obtener la ruta {route_id}")
+            raise Exception(f"Error al obtener la ruta {route_pk}")
         except Route.DoesNotExist:
-            raise Exception(f"Ruta {route_id} no existe")
+            raise Exception(f"Ruta {route_pk} no existe")
 
         if not admin_profile.routes_as_admin.filter(pk=route.id).exists():
             raise Exception("No tienes permiso para ver las transacciones de esta ruta")
