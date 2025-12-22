@@ -5,7 +5,8 @@ from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
 
-from accounts.models import CollectorProfile, ManagerProfile
+from accounts.constants import roles
+from accounts.models import CollectorProfile, ManagerProfile, User, AdminProfile
 from routes.models import Route
 from routes.nodes import RouteNode
 
@@ -115,3 +116,50 @@ class EditRoute(ClientIDMutation):
         route.save()
 
         return EditRoute(route=route)
+
+
+class AddAdminToRoute(relay.ClientIDMutation):
+    route = Field(RouteNode)
+
+    class Input:
+        route_id = String(required=True)
+        admin_email = String(required=True)
+
+    @classmethod
+    @login_required
+    def mutate_and_get_payload(cls, root, info, **input):
+        user = info.context.user
+
+        if not user.is_admin:
+            raise GraphQLError("No tienes permisos para realizar esta acción")
+
+        try:
+            route_id = from_global_id(input.get("route_id"))[1]
+            route = Route.objects.get(id=route_id)
+        except Exception:
+            raise GraphQLError("Ruta no válida")
+
+        try:
+            admin_user = User.objects.get(
+                email=input.get("admin_email"),
+                role=roles.ADMIN
+            )
+        except User.DoesNotExist:
+            raise GraphQLError("El usuario no es un administrador válido")
+
+        try:
+            admin_profile = admin_user.admin_profile
+        except AdminProfile.DoesNotExist:
+            raise GraphQLError("El administrador no tiene perfil asignado")
+
+        if route.administrators.filter(id=admin_profile.id).exists():
+            raise GraphQLError("Este administrador ya está asignado a la ruta")
+
+        route.administrators.add(admin_profile)
+
+        return AddAdminToRoute(route=route)
+
+
+
+
+

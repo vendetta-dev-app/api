@@ -4,7 +4,7 @@ from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 
 from routes.models import Route
-from routes.mutations import CreateRoute
+from routes.mutations import CreateRoute, EditRoute, AddAdminToRoute
 from routes.nodes import RouteNode
 
 
@@ -40,3 +40,5 @@ class Query(ObjectType):
 
 class Mutation(ObjectType):
     create_route = CreateRoute.Field()
+    edit_route = EditRoute.Field()
+    add_admin_to_route = AddAdminToRoute.Field()
