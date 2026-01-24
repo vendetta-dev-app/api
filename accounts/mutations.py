@@ -208,7 +208,7 @@ class UpdateClient(relay.ClientIDMutation):
     user = Field(UserNode)
 
     class Input(BaseUserInput):
-        id = String(required=True)  # Client global ID
+        id = String(required=True)
         alias = String(required=False)
         phone_number_1 = String(required=False)
         phone_number_2 = String(required=False)
