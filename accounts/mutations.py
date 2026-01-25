@@ -170,12 +170,12 @@ class CreateClient(relay.ClientIDMutation):
     @classmethod
     @login_required
     def mutate_and_get_payload(cls, root, info, **input):
-        collector = info.context.user
+        user = info.context.user
 
-        if not collector.is_collector:
-            raise GraphQLError('Solo los cobradores pueden crear clientes')
+        if not user.is_collector or user.is_admin:
+            raise GraphQLError('No tienes permiso para ejecutar esta accion')
 
-        if not hasattr(collector, 'collector_profile'):
+        if not hasattr(user, 'collector_profile'):
             raise GraphQLError('Este cobrador no tiene perfil asociado')
 
         email = input.get('email')
