@@ -82,7 +82,7 @@ class UserManager(BaseUserManager):
             user = self.create_user(
                 email=email,
                 password=password,
-                role=roles.COLLECTOR,
+                role=roles.MANAGER,
                 **extra_fields
             )
             ManagerProfile.objects.create(user=user, admin=admin_profile)
@@ -111,12 +111,32 @@ class UserManager(BaseUserManager):
         if not collector_profile:
             raise ValueError("Debe proporcionar un perfil de cobrador")
 
+        user_fields = {
+            "full_name": extra_fields.pop("full_name", None),
+            "phone_number_1": extra_fields.pop("phone_number_1", None),
+            "phone_number_2": extra_fields.pop("phone_number_2", None),
+        }
+
+        client_fields = {
+            "alias": extra_fields.pop("alias", None),
+            "identity_document": extra_fields.pop("identity_document", None),
+            "address_line_1": extra_fields.pop("address_line_1", None),
+            "address_line_2": extra_fields.pop("address_line_2", None),
+            "neighborhood": extra_fields.pop("neighborhood", None),
+        }
+
         with transaction.atomic():
             user = self.create_user(
                 email=email,
                 password=password,
                 role=roles.CLIENT,
-                **extra_fields
+                **user_fields
             )
-            ClientProfile.objects.create(user=user, collector=collector_profile, **extra_fields)
+
+            ClientProfile.objects.create(
+                user=user,
+                collector=collector_profile,
+                **client_fields
+            )
+
         return user
