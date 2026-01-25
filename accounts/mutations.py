@@ -173,7 +173,7 @@ class CreateClient(relay.ClientIDMutation):
     def mutate_and_get_payload(cls, root, info, **input):
         user = info.context.user
 
-        if not user.is_collector or user.is_admin:
+        if not (user.is_collector or user.is_admin):
             raise GraphQLError('No tienes permiso para ejecutar esta accion')
         try:
             collector_id = from_global_id(input["collector_id"])[1]
