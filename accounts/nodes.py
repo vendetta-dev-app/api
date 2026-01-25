@@ -1,4 +1,4 @@
-from graphene import relay
+from graphene import relay, Boolean
 from graphene_django import DjangoObjectType
 
 from accounts.filtersets import CollectorProfileFilterset
@@ -7,6 +7,11 @@ from snipets.graphql.connection import CountableConnection
 
 
 class UserNode(DjangoObjectType):
+    is_collector = Boolean()
+    is_admin = Boolean()
+    is_client = Boolean()
+
+
     class Meta:
         model = User
         filter_fields = []

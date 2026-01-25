@@ -44,18 +44,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         return hasattr(self, 'client_profile')
 
     @property
-    def is_admin(self):
-        """
-        Returns True if the user has an associated AdminProfile.
-        """
-        return hasattr(self, 'admin_profile')
-
-    @property
     def is_collector(self):
         """
         Returns True if the user has an associated CollectorProfile.
         """
         return hasattr(self, 'collector_profile')
+
+    @property
+    def is_admin(self):
+        """
+        Returns True if the user has an associated AdminProfile.
+        """
+        return hasattr(self, 'admin_profile')
 
 
 class ProfileBase(models.Model):

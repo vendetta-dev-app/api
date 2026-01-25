@@ -1,7 +1,9 @@
+import graphql_jwt
+from django.contrib.auth.models import update_last_login
 from graphene import ObjectType, Field
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql import GraphQLError
-from graphql_jwt import ObtainJSONWebToken, Verify, Refresh
+from graphql_jwt import Verify, Refresh
 from graphql_jwt.decorators import login_required
 
 from accounts.filtersets import CollectorProfileFilterset, ManagerProfileFilterset
@@ -57,6 +59,16 @@ class Query(ObjectType):
             raise GraphQLError("You are not an admin.")
 
         return ClientProfile.objects.filter(collector__admin=user.admin_profile)
+
+
+class ObtainJSONWebToken(graphql_jwt.relay.JSONWebTokenMutation):
+    user = Field(UserNode)
+
+    @classmethod
+    def resolve(cls, root, info, **kwargs):
+        update_last_login(None, info.context.user)
+        return cls(user=info.context.user)
+
 
 class Mutation(ObjectType):
     token_auth = ObtainJSONWebToken.Field()
