@@ -185,9 +185,6 @@ class CreateClient(relay.ClientIDMutation):
         except CollectorProfile.DoesNotExist:
             raise GraphQLError("No existe un cobrador con el id dado")
 
-        if not hasattr(user, 'collector_profile'):
-            raise GraphQLError('Este cobrador no tiene perfil asociado')
-
         email = input.get('email')
 
         if User.objects.filter(email=email).exists():
