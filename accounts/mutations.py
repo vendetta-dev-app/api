@@ -160,6 +160,7 @@ class CreateClient(relay.ClientIDMutation):
     user = Field(UserNode)
 
     class Input(BaseUserInput):
+        collector_id = String(required=True)
         password = String(required=True)
         alias = String(required=False)
         identity_document = String(required=True)
@@ -174,6 +175,15 @@ class CreateClient(relay.ClientIDMutation):
 
         if not user.is_collector or user.is_admin:
             raise GraphQLError('No tienes permiso para ejecutar esta accion')
+        try:
+            collector_id = from_global_id(input["collector_id"])[1]
+        except Exception:
+            raise GraphQLError("Error al obtener el collector id")
+
+        try:
+            collector = CollectorProfile.objects.get(id=collector_id)
+        except CollectorProfile.DoesNotExist:
+            raise GraphQLError("No existe un cobrador con el id dado")
 
         if not hasattr(user, 'collector_profile'):
             raise GraphQLError('Este cobrador no tiene perfil asociado')
@@ -185,7 +195,7 @@ class CreateClient(relay.ClientIDMutation):
 
         try:
             user = User.objects.create_client(
-                collector_profile=collector.collector_profile,
+                collector_profile=collector,
                 email=email,
                 password=input.get('password'),
                 full_name=input.get('full_name'),
