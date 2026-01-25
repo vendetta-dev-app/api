@@ -6,7 +6,7 @@ from graphql_relay import from_global_id
 
 from loans.filtersets import LoanFilterSet, PaymentFilterSet
 from loans.models import Loan, Payment
-from loans.mutations import CreateLoan, CreatePayment
+from loans.mutations import CreateLoan, CreatePayment, ApproveLoan, RejectLoan, VoidPayment
 from loans.nodes import LoanNode, PaymentNode
 
 
@@ -33,6 +33,18 @@ class Query(ObjectType):
     loans_by_client = DjangoFilterConnectionField(
         LoanNode,
         client_id=String(required=True, description="Client ID to filter by")
+    )
+
+    # Query pending loans awaiting approval (admin only)
+    pending_loans = DjangoFilterConnectionField(
+        LoanNode,
+        description="Loans pending approval"
+    )
+
+    # Query overdue loans
+    overdue_loans = DjangoFilterConnectionField(
+        LoanNode,
+        description="Loans past their due date"
     )
 
     # Query payments by loan
@@ -128,7 +140,44 @@ class Query(ObjectType):
 
         return Payment.objects.filter(loan_id=pk).select_related('loan')
 
+    @login_required
+    def resolve_pending_loans(self, info, **kwargs):
+        user = info.context.user
+
+        if not user.is_admin:
+            raise GraphQLError("Solo los administradores pueden ver préstamos pendientes")
+
+        # Get pending loans from routes managed by this admin
+        routes = user.admin_profile.routes_as_admin.all()
+        return Loan.objects.filter(
+            route__in=routes,
+            is_approved=False,
+            is_rejected=False
+        ).select_related('route', 'client__user', 'collector__user')
+
+    @login_required
+    def resolve_overdue_loans(self, info, **kwargs):
+        user = info.context.user
+        from django.utils import timezone
+
+        if user.is_admin:
+            routes = user.admin_profile.routes_as_admin.all()
+            queryset = Loan.objects.filter(route__in=routes)
+        elif user.is_collector:
+            queryset = Loan.objects.filter(collector__user=user)
+        else:
+            raise GraphQLError("No tienes permisos para consultar préstamos")
+
+        # Filter overdue loans: approved, not fully paid, past due date
+        return queryset.filter(
+            is_approved=True,
+            due_date__lt=timezone.now().date()
+        ).select_related('route', 'client__user', 'collector__user')
+
 
 class Mutation(ObjectType):
     create_loan = CreateLoan.Field()
+    approve_loan = ApproveLoan.Field()
+    reject_loan = RejectLoan.Field()
     create_payment = CreatePayment.Field()
+    void_payment = VoidPayment.Field()

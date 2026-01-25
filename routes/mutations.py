@@ -79,7 +79,7 @@ class EditRoute(ClientIDMutation):
         user = info.context.user
 
         if not user.is_admin:
-            raise GraphQLError('No tienes persmisos para realizar esta acción')
+            raise GraphQLError('No tienes permisos para realizar esta acción')
 
         try:
             route_id = from_global_id(input.pop('route_id'))[1]
