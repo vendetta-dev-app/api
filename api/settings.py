@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'routes.apps.RoutesConfig',
     'transactions.apps.TransactionsConfig',
+    'loans.apps.LoansConfig',
 ]
 
 MIDDLEWARE = [

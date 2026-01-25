@@ -15,8 +15,8 @@ from accounts.managers import UserManager
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(verbose_name="Email address", unique=True)
     full_name = models.CharField(max_length=100)
-    phone_number_1 = models.CharField(max_length=10)
-    phone_number_2 = models.CharField(max_length=10, blank=True, null=True)
+    phone_number_1 = models.CharField(max_length=12)
+    phone_number_2 = models.CharField(max_length=12, blank=True, null=True)
     role = models.CharField(
         max_length=9,
         choices=USER_ROLES_CHOICES,
