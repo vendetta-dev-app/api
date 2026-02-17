@@ -3,11 +3,13 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
 
-from loans.choices import INTEREST_RATE_CHOICES, PAYMENT_METHOD_CHOICES
+from loans.choices import INTEREST_RATE_CHOICES, PAYMENT_METHOD_CHOICES, PAYMENT_FREQUENCY_CHOICES
+from loans.constants import payment_frequency
 from transactions.models import Transaction
 
 
@@ -34,6 +36,18 @@ class Loan(models.Model):
         choices=INTEREST_RATE_CHOICES,
         help_text="Tasa de interés permitida: 0%, 10% o 20%"
     )
+    
+    installments = models.PositiveIntegerField(
+        help_text="Cantidad de cuotas (mínimo 1, máximo 90)",
+        default=1
+    )
+
+    payment_frequency = models.CharField(
+        max_length=10,
+        choices=PAYMENT_FREQUENCY_CHOICES,
+        default=payment_frequency.WEEKLY,
+        help_text="Frecuencia de pagos: Diaria, Semanal o Mensual"
+    )
 
     # Approval workflow fields
     is_approved = models.BooleanField(default=False)
@@ -58,6 +72,10 @@ class Loan(models.Model):
         verbose_name = "Loan"
         verbose_name_plural = "Loans"
         ordering = ['created_at']
+
+    def clean(self):
+        if self.installments < 1 or self.installments > 90:
+            raise ValidationError({'installments': 'La cantidad de cuotas debe estar entre 1 y 90.'})
 
     def __str__(self):
         return f'{self.amount}-{self.route.name}-{self.collector.user.full_name}'
@@ -162,3 +180,10 @@ class Payment(models.Model):
     def is_voided(self) -> bool:
         """Check if payment has been voided"""
         return self.voided_at is not None
+        """Calcula el valor total del préstamo con interés fijo"""
+        return self.amount + ((self.interest_rate/100) * self.amount)
+
+    @property
+    def installment_amount(self):
+        """Calcula el valor de cada cuota basado en el número de cuotas"""
+        return self.total_amount / self.installments
