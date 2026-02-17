@@ -86,7 +86,7 @@ class Route(models.Model):
     def current_balance(self):
         """
         Calcula el saldo actual de la ruta:
-        starting_balance - préstamos + pagos de préstamos
+        starting_balance - préstamos + pagos de préstamos - pagos anulados
         """
         qs = Transaction.objects.filter(
             content_type=ContentType.objects.get_for_model(Route),
@@ -101,4 +101,9 @@ class Route(models.Model):
             transaction_type=transaction_types.LOAN_PAYMENT
         ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-        return self.starting_balance - loans_total + loan_payments_total
+        # Subtract voided payments (they reduce the balance)
+        voided_payments_total = qs.filter(
+            transaction_type=transaction_types.PAYMENT_VOID
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+        return self.starting_balance - loans_total + loan_payments_total - voided_payments_total

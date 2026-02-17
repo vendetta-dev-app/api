@@ -57,6 +57,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         return hasattr(self, 'admin_profile')
 
+    @property
+    def is_manager(self):
+        """
+        Returns True if the user has an associated ManagerProfile.
+        """
+        return hasattr(self, 'manager_profile')
+
 
 class ProfileBase(models.Model):
     """

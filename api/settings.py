@@ -19,14 +19,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-y%itquv^7=0=&m90lv(zi(oq4%0vd8p49-tywo^o@oqu8zsm#5'
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    'django-insecure-y%itquv^7=0=&m90lv(zi(oq4%0vd8p49-tywo^o@oqu8zsm#5'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS Configuration
+CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "False").lower() in ("true", "1", "yes")
+CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if os.environ.get("CORS_ALLOWED_ORIGINS") else []
 
 if os.environ.get("CSRF_TRUSTED_ORIGINS", None):
     CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(

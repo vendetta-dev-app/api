@@ -57,6 +57,7 @@ class CreateManager(relay.ClientIDMutation):
         password = String(required=True)
 
     @classmethod
+    @login_required
     def mutate_and_get_payload(cls, root, info, **input):
         admin = info.context.user
 
@@ -130,7 +131,7 @@ class EditCollector(relay.ClientIDMutation):
     @login_required
     def mutate_and_get_payload(cls, root, info, **input):
         user_id = input.pop("user_id")
-        print(input)
+
         try:
             user_id = from_global_id(user_id)[1]
         except Exception as e:
@@ -138,7 +139,7 @@ class EditCollector(relay.ClientIDMutation):
 
         try:
             user = User.objects.get(id=user_id)
-        except CollectorProfile.DoesNotExist:
+        except User.DoesNotExist:
             raise GraphQLError("No existe un usuario con este id")
 
         if not user.is_collector:
@@ -147,7 +148,7 @@ class EditCollector(relay.ClientIDMutation):
         for field, value in input.items():
             if field == 'is_active':
                 setattr(user.collector_profile, field, value)
-            if hasattr(user, field):
+            elif hasattr(user, field):
                 setattr(user, field, value)
 
         user.save()
@@ -238,29 +239,33 @@ class UpdateClient(relay.ClientIDMutation):
         # Decode Relay global ID to get the database ID
         try:
             client_id = from_global_id(input.get("id"))[1]
-            client = User.objects.get(id=client_id, collector_profile=collector.collector_profile)
+            client_user = User.objects.select_related('client_profile').get(
+                id=client_id,
+                client_profile__collector=collector.collector_profile
+            )
         except User.DoesNotExist:
             raise GraphQLError("Cliente no encontrado o no pertenece a este cobrador")
 
-        # Update allowed fields
-        updatable_fields = [
-            "alias",
-            "phone_number_1",
-            "phone_number_2",
-            "address_line_1",
-            "address_line_2",
-            "neighborhood",
-            "full_name",
-        ]
+        # Fields that belong to User model
+        user_fields = ["phone_number_1", "phone_number_2", "full_name"]
 
-        for field in updatable_fields:
+        # Fields that belong to ClientProfile model
+        profile_fields = ["alias", "address_line_1", "address_line_2", "neighborhood"]
+
+        for field in user_fields:
             value = input.get(field)
             if value is not None:
-                setattr(client, field, value)
+                setattr(client_user, field, value)
+
+        for field in profile_fields:
+            value = input.get(field)
+            if value is not None:
+                setattr(client_user.client_profile, field, value)
 
         try:
-            client.save()
+            client_user.save()
+            client_user.client_profile.save()
         except Exception as e:
             raise GraphQLError(f"Error actualizando cliente: {str(e)}")
 
-        return UpdateClient(user=client.user)
+        return UpdateClient(user=client_user)
