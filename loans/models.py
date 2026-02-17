@@ -180,8 +180,6 @@ class Payment(models.Model):
     def is_voided(self) -> bool:
         """Check if payment has been voided"""
         return self.voided_at is not None
-        """Calcula el valor total del préstamo con interés fijo"""
-        return self.amount + ((self.interest_rate/100) * self.amount)
 
     @property
     def installment_amount(self):
