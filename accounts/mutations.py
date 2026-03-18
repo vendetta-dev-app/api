@@ -84,6 +84,56 @@ class CreateManager(relay.ClientIDMutation):
         return CreateManager(manager=user.manager_profile)
 
 
+class UpdateManager(relay.ClientIDMutation):
+    manager = Field(ManagerNode)
+
+    class Input:
+        user_id = String(required=True)
+        email = String(required=False)
+        full_name = String(required=False)
+        phone_number_1 = String(required=False)
+        phone_number_2 = String(required=False)
+        is_active = Boolean(required=False)
+
+    @classmethod
+    @login_required
+    def mutate_and_get_payload(cls, root, info, **input):
+        admin = info.context.user
+
+        if not admin.is_admin:
+            raise GraphQLError('Solo los administradores pueden editar managers')
+
+        user_id = input.pop("user_id")
+
+        try:
+            user_id = from_global_id(user_id)[1]
+        except Exception as e:
+            raise GraphQLError(f"Error editar manager: {str(e)}")
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            raise GraphQLError("No existe un usuario con este id")
+
+        if not user.is_manager:
+            raise GraphQLError("No existe un perfil de manager para este usuario")
+
+        # Verify the manager belongs to this admin
+        if user.manager_profile.admin != admin.admin_profile:
+            raise GraphQLError("No tienes permiso para editar este manager")
+
+        for field, value in input.items():
+            if field == 'is_active':
+                setattr(user.manager_profile, field, value)
+            elif hasattr(user, field):
+                setattr(user, field, value)
+
+        user.save()
+        user.manager_profile.save()
+
+        return UpdateManager(manager=user.manager_profile)
+
+
 
 class CreateCollector(relay.ClientIDMutation):
     collector = Field(CollectorNode)
@@ -120,7 +170,7 @@ class CreateCollector(relay.ClientIDMutation):
         return CreateCollector(collector=user.collector_profile)
 
 
-class EditCollector(relay.ClientIDMutation):
+class UpdateCollector(relay.ClientIDMutation):
     user = Field(UserNode)
 
     class Input(BaseUserInput):
@@ -154,7 +204,7 @@ class EditCollector(relay.ClientIDMutation):
         user.save()
         user.collector_profile.save()
 
-        return EditCollector(user=user)
+        return UpdateCollector(user=user)
 
 
 class CreateClient(relay.ClientIDMutation):

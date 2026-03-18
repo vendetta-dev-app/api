@@ -8,7 +8,7 @@ from graphql_jwt.decorators import login_required
 
 from accounts.filtersets import CollectorProfileFilterset, ManagerProfileFilterset
 from accounts.models import CollectorProfile, ManagerProfile, ClientProfile
-from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, EditCollector, CreateManager, UpdateClient
+from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, UpdateCollector, CreateManager, UpdateManager, UpdateClient
 from accounts.nodes import UserNode, CollectorNode, ManagerNode, ClientNode
 
 
@@ -77,7 +77,8 @@ class Mutation(ObjectType):
 
     create_admin = CreateAdmin.Field()
     create_manager = CreateManager.Field()
+    update_manager = UpdateManager.Field()
     create_collector = CreateCollector.Field()
-    edit_collector = EditCollector.Field()
+    update_collector = UpdateCollector.Field()
     create_client = CreateClient.Field()
     update_client = UpdateClient.Field()
