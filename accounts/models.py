@@ -85,9 +85,11 @@ class ClientProfile(ProfileBase):
     address_line_2 = models.CharField(max_length=255, blank=True, null=True)
     neighborhood = models.CharField(max_length=100)
 
-    collector = models.ForeignKey(
-        'CollectorProfile',
+    route = models.ForeignKey(
+        'routes.Route',
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name='clients'
     )
 
@@ -102,6 +104,13 @@ class CollectorProfile(ProfileBase):
         'AdminProfile',
         on_delete=models.PROTECT,
         related_name='collectors'
+    )
+    route = models.OneToOneField(
+        'routes.Route',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='collector_profile'
     )
     is_active = models.BooleanField(default=False)
 

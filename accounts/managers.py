@@ -105,11 +105,8 @@ class UserManager(BaseUserManager):
             CollectorProfile.objects.create(user=user, admin=admin_profile)
         return user
 
-    def create_client(self, collector_profile, email, password=None, **extra_fields):
+    def create_client(self, route, email, password=None, **extra_fields):
         from accounts.models import ClientProfile
-
-        if not collector_profile:
-            raise ValueError("Debe proporcionar un perfil de cobrador")
 
         user_fields = {
             "full_name": extra_fields.pop("full_name", None),
@@ -135,7 +132,7 @@ class UserManager(BaseUserManager):
 
             ClientProfile.objects.create(
                 user=user,
-                collector=collector_profile,
+                route=route,
                 **client_fields
             )
 

@@ -51,10 +51,14 @@ class CreateRoute(relay.ClientIDMutation):
             route = Route.objects.create(
                 name=input.get('name'),
                 city_id=city_id,
-                collector_id=collector_id,
                 manager_id=manager_id,
             )
             route.administrators.set([admin_profile])
+
+            # Asignar la ruta al collector
+            collector = CollectorProfile.objects.get(id=collector_id)
+            collector.route = route
+            collector.save()
 
             if initial_value:
                 route.set_starting_balance(
@@ -111,9 +115,17 @@ class EditRoute(ClientIDMutation):
         except ManagerProfile.DoesNotExist:
             raise GraphQLError("No existe un cobrador con este id")
 
-        route.collector = collector
         route.manager = manager
         route.save()
+
+        # Actualizar la ruta del collector (verificar que no tenga otra)
+        current_collector = route.collector_profile
+        if current_collector and current_collector != collector:
+            # La ruta ya tiene otro collector asignado
+            current_collector.route = None
+            current_collector.save()
+        collector.route = route
+        collector.save()
 
         return EditRoute(route=route)
 

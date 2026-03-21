@@ -58,7 +58,9 @@ class Query(ObjectType):
         if not user.is_admin:
             raise GraphQLError("You are not an admin.")
 
-        return ClientProfile.objects.filter(collector__admin=user.admin_profile)
+        return ClientProfile.objects.filter(
+            route__collector_profile__admin=user.admin_profile
+        )
 
 
 class ObtainJSONWebToken(graphql_jwt.relay.JSONWebTokenMutation):

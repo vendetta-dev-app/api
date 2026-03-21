@@ -99,7 +99,7 @@ class Query(ObjectType):
             from routes.models import Route
             try:
                 route = Route.objects.get(id=pk)
-                if route.collector != user.collector_profile:
+                if route.collector_profile != user.collector_profile:
                     raise GraphQLError("No tienes acceso a esta ruta")
             except Route.DoesNotExist:
                 raise GraphQLError("La ruta no existe")
@@ -107,7 +107,7 @@ class Query(ObjectType):
             raise GraphQLError("No tienes permisos para consultar préstamos")
 
         return Loan.objects.filter(route_id=pk).select_related(
-            'route', 'client__user', 'collector__user'
+            'route', 'client__user', 'route__collector_profile__user'
         )
 
     @login_required

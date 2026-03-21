@@ -17,15 +17,6 @@ class Route(models.Model):
         on_delete=models.PROTECT,
         related_name='routes')
 
-    # One collector per route
-    collector = models.ForeignKey(
-        'accounts.CollectorProfile',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='routes_as_collector'
-    )
-
     transactions = GenericRelation(
         Transaction,
         content_type_field='content_type',

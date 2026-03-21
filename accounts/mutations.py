@@ -4,6 +4,7 @@ from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
 
 from accounts.models import InvitationCode, User, CollectorProfile
+from routes.models import Route
 from accounts.nodes import UserNode, CollectorNode, ManagerNode
 
 
@@ -211,7 +212,7 @@ class CreateClient(relay.ClientIDMutation):
     user = Field(UserNode)
 
     class Input(BaseUserInput):
-        collector_id = String(required=True)
+        route_id = String(required=False)
         password = String(required=True)
         alias = String(required=False)
         identity_document = String(required=True)
@@ -226,15 +227,42 @@ class CreateClient(relay.ClientIDMutation):
 
         if not (user.is_collector or user.is_admin):
             raise GraphQLError('No tienes permiso para ejecutar esta accion')
-        try:
-            collector_id = from_global_id(input["collector_id"])[1]
-        except Exception:
-            raise GraphQLError("Error al obtener el collector id")
 
-        try:
-            collector = CollectorProfile.objects.get(id=collector_id)
-        except CollectorProfile.DoesNotExist:
-            raise GraphQLError("No existe un cobrador con el id dado")
+        route = None
+        route_id_input = input.get("route_id")
+
+        # Admin: debe proporcionar route_id
+        if user.is_admin:
+            if not route_id_input:
+                raise GraphQLError('El admin debe proporcionar una ruta')
+            try:
+                route_id = from_global_id(route_id_input)[1]
+            except Exception:
+                raise GraphQLError("Error al obtener el route id")
+            try:
+                route = Route.objects.get(id=route_id)
+            except Route.DoesNotExist:
+                raise GraphQLError("No existe una ruta con el id dado")
+
+        # Collector: usa su ruta si no se proporciona route_id
+        elif user.is_collector:
+            if route_id_input:
+                # Si envía route_id, validar que le pertenezca
+                try:
+                    route_id = from_global_id(route_id_input)[1]
+                except Exception:
+                    raise GraphQLError("Error al obtener el route id")
+                try:
+                    route = Route.objects.get(id=route_id)
+                    if route.collector_profile != user.collector_profile:
+                        raise GraphQLError("No existe una ruta con ese id o no te pertenece")
+                except Route.DoesNotExist:
+                    raise GraphQLError("No existe una ruta con ese id o no te pertenece")
+            else:
+                # Usar la ruta del collector (OneToOne)
+                if not user.collector_profile.route:
+                    raise GraphQLError('No tienes una ruta asignada. Contacta al administrador.')
+                route = user.collector_profile.route
 
         email = input.get('email')
 
@@ -243,7 +271,7 @@ class CreateClient(relay.ClientIDMutation):
 
         try:
             user = User.objects.create_client(
-                collector_profile=collector,
+                route=route,
                 email=email,
                 password=input.get('password'),
                 full_name=input.get('full_name'),
@@ -291,7 +319,7 @@ class UpdateClient(relay.ClientIDMutation):
             client_id = from_global_id(input.get("id"))[1]
             client_user = User.objects.select_related('client_profile').get(
                 id=client_id,
-                client_profile__collector=collector.collector_profile
+                client_profile__route__collector_profile=collector.collector_profile
             )
         except User.DoesNotExist:
             raise GraphQLError("Cliente no encontrado o no pertenece a este cobrador")

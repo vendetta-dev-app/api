@@ -78,7 +78,8 @@ class Loan(models.Model):
             raise ValidationError({'installments': 'La cantidad de cuotas debe estar entre 1 y 90.'})
 
     def __str__(self):
-        return f'{self.amount}-{self.route.name}-{self.collector.user.full_name}'
+        collector_name = self.route.collector_profile.user.full_name if self.route.collector_profile else 'Sin Collector'
+        return f'{self.amount}-{self.route.name}-{collector_name}'
 
     @property
     def total_amount(self):

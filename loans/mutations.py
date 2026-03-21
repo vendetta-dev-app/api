@@ -60,18 +60,18 @@ class CreateLoan(relay.ClientIDMutation):
             if not route.administrators.filter(id=user.admin_profile.id).exists():
                 raise GraphQLError("No tienes acceso a esta ruta")
         elif user.is_collector:
-            if route.collector != user.collector_profile:
+            if route.collector_profile != user.collector_profile:
                 raise GraphQLError("No tienes acceso a esta ruta")
 
         # Get client
         try:
-            client = ClientProfile.objects.select_related('collector', 'user').get(id=client_id)
+            client = ClientProfile.objects.select_related('route', 'user').get(id=client_id)
         except ClientProfile.DoesNotExist:
             raise GraphQLError("No existe un cliente con este id")
 
-        # Validate client belongs to the route's collector
-        if route.collector and client.collector != route.collector:
-            raise GraphQLError("El cliente no pertenece al cobrador asignado a esta ruta")
+        # Validate client belongs to the route
+        if client.route != route:
+            raise GraphQLError("El cliente no pertenece a esta ruta")
 
         amount = Decimal(str(input.get('amount')))
         interest_rate = Decimal(str(input.get('interest_rate')))
@@ -86,10 +86,10 @@ class CreateLoan(relay.ClientIDMutation):
         if interest_rate not in valid_rates:
             raise GraphQLError("La tasa de interés debe ser 0%, 10% o 20%")
 
-        # Get collector from client
-        collector = client.collector
+        # Get collector from route
+        collector = route.collector_profile
         if not collector:
-            raise GraphQLError("El cliente no tiene un cobrador asignado")
+            raise GraphQLError("La ruta no tiene un cobrador asignado")
 
         # Create Loan in PENDING status (no transactions yet)
         loan = Loan.objects.create(
@@ -132,7 +132,7 @@ class ApproveLoan(relay.ClientIDMutation):
         # Get loan
         try:
             loan = Loan.objects.select_related(
-                'route', 'client__user', 'collector'
+                'route', 'client__user', 'route__collector_profile'
             ).get(id=loan_id)
         except Loan.DoesNotExist:
             raise GraphQLError("No existe un préstamo con este id")
@@ -266,7 +266,7 @@ class CreatePayment(relay.ClientIDMutation):
         # Get loan
         try:
             loan = Loan.objects.select_related(
-                'route', 'client__user', 'collector'
+                'route', 'client__user', 'route__collector_profile'
             ).get(id=loan_id)
         except Loan.DoesNotExist:
             raise GraphQLError("No existe un préstamo con este id")
@@ -276,7 +276,7 @@ class CreatePayment(relay.ClientIDMutation):
             if not loan.route.administrators.filter(id=user.admin_profile.id).exists():
                 raise GraphQLError("No tienes acceso a este préstamo")
         elif user.is_collector:
-            if loan.collector != user.collector_profile:
+            if loan.route.collector_profile != user.collector_profile:
                 raise GraphQLError("No tienes acceso a este préstamo")
 
         # Validate loan is approved

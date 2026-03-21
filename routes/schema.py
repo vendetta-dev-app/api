@@ -56,7 +56,7 @@ class Query(ObjectType):
             if not route.administrators.filter(id=user.admin_profile.id).exists():
                 raise GraphQLError("No tienes acceso a esta ruta")
         elif user.is_collector:
-            if route.collector != user.collector_profile:
+            if route.collector_profile != user.collector_profile:
                 raise GraphQLError("No tienes acceso a esta ruta")
         else:
             raise GraphQLError("No tienes permisos para consultar rutas")
