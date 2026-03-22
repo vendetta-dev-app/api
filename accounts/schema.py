@@ -1,10 +1,11 @@
 import graphql_jwt
 from django.contrib.auth.models import update_last_login
-from graphene import ObjectType, Field
+from graphene import ObjectType, Field, String, ID
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql import GraphQLError
 from graphql_jwt import Verify, Refresh
 from graphql_jwt.decorators import login_required
+from graphql_relay import from_global_id
 
 from accounts.filtersets import CollectorProfileFilterset, ManagerProfileFilterset
 from accounts.models import CollectorProfile, ManagerProfile, ClientProfile
@@ -22,6 +23,8 @@ class Query(ObjectType):
     clients_by_admin = DjangoFilterConnectionField(ClientNode)
 
     clients_by_collector = DjangoFilterConnectionField(ClientNode)
+
+    client = Field(ClientNode, id=ID(required=True))
 
     def resolve_me(self, info):
         return info.context.user
@@ -74,6 +77,33 @@ class Query(ObjectType):
         return ClientProfile.objects.filter(
             route=user.collector_profile.route
         ).select_related('user')
+
+    @login_required
+    def resolve_client(self, info, id, **kwargs):
+        user = info.context.user
+
+        try:
+            pk = from_global_id(id)[1]
+        except Exception:
+            raise GraphQLError("El id del cliente no es válido")
+
+        try:
+            client = ClientProfile.objects.get(id=pk)
+        except ClientProfile.DoesNotExist:
+            raise GraphQLError("El cliente no existe")
+
+        # Validate user has access to this client
+        if user.is_admin:
+            if client.route and client.route.collector_profile:
+                if client.route.collector_profile.admin != user.admin_profile:
+                    raise GraphQLError("No tienes acceso a este cliente")
+        elif user.is_collector:
+            if client.route != user.collector_profile.route:
+                raise GraphQLError("No tienes acceso a este cliente")
+        else:
+            raise GraphQLError("No tienes permisos para consultar clientes")
+
+        return client
 
 
 class ObtainJSONWebToken(graphql_jwt.relay.JSONWebTokenMutation):
