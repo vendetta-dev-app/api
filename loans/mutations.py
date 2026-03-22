@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
-from graphene import relay, Field, String, Decimal as GrapheneDecimal
+from graphene import relay, Field, String, Decimal as GrapheneDecimal, Int
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
@@ -27,6 +27,8 @@ class CreateLoan(relay.ClientIDMutation):
         client_id = String(required=True)
         amount = GrapheneDecimal(required=True)
         interest_rate = GrapheneDecimal(required=True)
+        installments = Int(description="Number of installments (1-90)")
+        payment_frequency = String(description="Payment frequency: DAILY, WEEKLY, or MONTHLY")
         due_date = String(description="Due date in YYYY-MM-DD format")
 
     @classmethod
@@ -75,6 +77,8 @@ class CreateLoan(relay.ClientIDMutation):
 
         amount = Decimal(str(input.get('amount')))
         interest_rate = Decimal(str(input.get('interest_rate')))
+        installments = input.get('installments', 1)
+        payment_frequency = input.get('payment_frequency', 'WEEKLY')
         due_date = input.get('due_date')
 
         # Validate amount is positive
@@ -85,6 +89,15 @@ class CreateLoan(relay.ClientIDMutation):
         valid_rates = [Decimal('0'), Decimal('10'), Decimal('20')]
         if interest_rate not in valid_rates:
             raise GraphQLError("La tasa de interés debe ser 0%, 10% o 20%")
+
+        # Validate installments
+        if installments < 1 or installments > 90:
+            raise GraphQLError("El número de cuotas debe estar entre 1 y 90")
+
+        # Validate payment frequency
+        valid_frequencies = ['DAILY', 'WEEKLY', 'MONTHLY']
+        if payment_frequency not in valid_frequencies:
+            raise GraphQLError("La frecuencia de pago debe ser DAILY, WEEKLY o MONTHLY")
 
         # Get collector from route
         collector = route.collector_profile
@@ -98,6 +111,8 @@ class CreateLoan(relay.ClientIDMutation):
             collector=collector,
             amount=amount,
             interest_rate=interest_rate,
+            installments=installments,
+            payment_frequency=payment_frequency,
             due_date=due_date,
             is_approved=False  # Requires admin approval
         )
