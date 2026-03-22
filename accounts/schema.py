@@ -21,6 +21,8 @@ class Query(ObjectType):
 
     clients_by_admin = DjangoFilterConnectionField(ClientNode)
 
+    clients_by_collector = DjangoFilterConnectionField(ClientNode)
+
     def resolve_me(self, info):
         return info.context.user
 
@@ -61,6 +63,17 @@ class Query(ObjectType):
         return ClientProfile.objects.filter(
             route__collector_profile__admin=user.admin_profile
         )
+
+    @login_required
+    def resolve_clients_by_collector(self, info, **kwargs):
+        user = info.context.user
+
+        if not user.is_collector:
+            raise GraphQLError("Solo los cobradores pueden consultar sus clientes")
+
+        return ClientProfile.objects.filter(
+            route=user.collector_profile.route
+        ).select_related('user')
 
 
 class ObtainJSONWebToken(graphql_jwt.relay.JSONWebTokenMutation):

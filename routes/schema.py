@@ -13,9 +13,6 @@ class Query(ObjectType):
     # Query to get routes where the logged-in user is an admin
     routes_by_admin = DjangoFilterConnectionField(RouteNode)
 
-    # Query to get routes where the logged-in user is a collector
-    routes_by_collector = DjangoFilterConnectionField(RouteNode)
-
     # Query single route by ID with authorization
     route = Field(RouteNode, id=String(required=True))
 
@@ -27,15 +24,6 @@ class Query(ObjectType):
             raise GraphQLError('No eres administrador')
 
         return Route.objects.filter(administrators=user.admin_profile)
-
-    @login_required
-    def resolve_routes_by_collector(self, info, **kwargs):
-        user = info.context.user
-
-        if not user.is_collector:
-            raise GraphQLError('No eres cobrador')
-
-        return Route.objects.filter(collector__user=user)
 
     @login_required
     def resolve_route(self, info, id, **kwargs):

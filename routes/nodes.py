@@ -30,7 +30,7 @@ class RouteNode(DjangoObjectType):
     def get_queryset(cls, queryset, info):
         """Optimize queries with select_related and prefetch_related"""
         return queryset.select_related(
-            'collector__user',
+            'collector_profile__user',
             'manager__user',
             'city'
         ).prefetch_related('administrators__user')

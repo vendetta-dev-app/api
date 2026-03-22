@@ -105,8 +105,22 @@ class UserManager(BaseUserManager):
             CollectorProfile.objects.create(user=user, admin=admin_profile)
         return user
 
-    def create_client(self, route, email, password=None, **extra_fields):
+    def create_client(self, route, email=None, password=None, **extra_fields):
         from accounts.models import ClientProfile
+        import secrets
+        import string
+
+        if not route:
+            raise ValueError("Debe proporcionar una ruta")
+
+        # Auto-generate email if not provided (clients don't need login)
+        if not email:
+            random_suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(8))
+            email = f"client_{random_suffix}@no-login.local"
+
+        # Auto-generate password if not provided
+        if not password:
+            password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
 
         user_fields = {
             "full_name": extra_fields.pop("full_name", None),
@@ -120,6 +134,10 @@ class UserManager(BaseUserManager):
             "address_line_1": extra_fields.pop("address_line_1", None),
             "address_line_2": extra_fields.pop("address_line_2", None),
             "neighborhood": extra_fields.pop("neighborhood", None),
+            "city": extra_fields.pop("city", None),
+            "address_reference": extra_fields.pop("address_reference", None),
+            "latitude": extra_fields.pop("latitude", None),
+            "longitude": extra_fields.pop("longitude", None),
         }
 
         with transaction.atomic():

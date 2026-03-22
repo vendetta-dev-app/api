@@ -83,7 +83,14 @@ class ClientProfile(ProfileBase):
     identity_document = models.CharField(max_length=30, unique=True)
     address_line_1 = models.CharField(max_length=255)
     address_line_2 = models.CharField(max_length=255, blank=True, null=True)
-    neighborhood = models.CharField(max_length=100)
+    neighborhood = models.CharField(max_length=100, verbose_name="Comuna/Barrio")
+
+    # Additional location fields for Chile and future Google Maps integration
+    city = models.CharField(max_length=100, blank=True, null=True, verbose_name="Ciudad")
+    address_reference = models.TextField(blank=True, null=True, verbose_name="Referencia",
+                                       help_text="Puntos de referencia para llegar (ej: 'cerca de la plaza', 'edificio color azul')")
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, blank=True, null=True, verbose_name="Latitud")
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, blank=True, null=True, verbose_name="Longitud")
 
     route = models.ForeignKey(
         'routes.Route',
@@ -97,6 +104,18 @@ class ClientProfile(ProfileBase):
 
     class Meta:
         default_related_name = "client_profile"
+
+    @property
+    def has_coordinates(self):
+        """Returns True if both latitude and longitude are set."""
+        return self.latitude is not None and self.longitude is not None
+
+    @property
+    def google_maps_url(self):
+        """Returns a Google Maps URL with the client's coordinates."""
+        if self.has_coordinates:
+            return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+        return None
 
 
 class CollectorProfile(ProfileBase):

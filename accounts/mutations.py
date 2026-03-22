@@ -1,4 +1,5 @@
 from graphene import relay, Field, String, Boolean
+import graphene
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
@@ -146,6 +147,7 @@ class CreateCollector(relay.ClientIDMutation):
     @login_required
     def mutate_and_get_payload(cls, root, info, **input):
         admin = info.context.user
+        print("User: ", admin.admin_profile)
 
         if not admin.is_admin:
             raise GraphQLError('Solo los administradores pueden crear cobradores')
@@ -211,14 +213,26 @@ class UpdateCollector(relay.ClientIDMutation):
 class CreateClient(relay.ClientIDMutation):
     user = Field(UserNode)
 
-    class Input(BaseUserInput):
+    class Input:
+        # Optional route_id (admin must provide, collector uses own route)
         route_id = String(required=False)
-        password = String(required=True)
+        # Optional email/password (clients don't need login)
+        email = String(required=False)
+        password = String(required=False)
+        # Required fields
+        full_name = String(required=True)
+        phone_number_1 = String(required=True)
+        phone_number_2 = String(required=False)
         alias = String(required=False)
         identity_document = String(required=True)
         address_line_1 = String(required=True)
         address_line_2 = String(required=False)
-        neighborhood = String(required=True)
+        neighborhood = String(required=True, verbose_name="Comuna/Barrio")
+        # New location fields
+        city = String(required=False, verbose_name="Ciudad")
+        address_reference = String(required=False, verbose_name="Referencia")
+        latitude = graphene.Float(required=False)
+        longitude = graphene.Float(required=False)
 
     @classmethod
     @login_required
@@ -264,13 +278,19 @@ class CreateClient(relay.ClientIDMutation):
                     raise GraphQLError('No tienes una ruta asignada. Contacta al administrador.')
                 route = user.collector_profile.route
 
-        email = input.get('email')
+        # Check if identity_document already exists
+        identity_document = input.get('identity_document')
+        if User.objects.filter(client_profile__identity_document=identity_document).exists():
+            raise GraphQLError('Ya existe un cliente con este RUT')
 
-        if User.objects.filter(email=email).exists():
-            raise GraphQLError('Ya existe un usuario con este correo')
+        # Check email uniqueness only if provided (and not auto-generated)
+        email = input.get('email')
+        if email and not email.endswith('@no-login.local'):
+            if User.objects.filter(email=email).exists():
+                raise GraphQLError('Ya existe un usuario con este correo')
 
         try:
-            user = User.objects.create_client(
+            user_obj = User.objects.create_client(
                 route=route,
                 email=email,
                 password=input.get('password'),
@@ -278,22 +298,26 @@ class CreateClient(relay.ClientIDMutation):
                 phone_number_1=input.get('phone_number_1'),
                 phone_number_2=input.get('phone_number_2'),
                 alias=input.get('alias'),
-                identity_document=input.get('identity_document'),
+                identity_document=identity_document,
                 address_line_1=input.get('address_line_1'),
                 address_line_2=input.get('address_line_2'),
                 neighborhood=input.get('neighborhood'),
+                city=input.get('city'),
+                address_reference=input.get('address_reference'),
+                latitude=input.get('latitude'),
+                longitude=input.get('longitude'),
             )
 
         except Exception as e:
             raise GraphQLError(f'Error creando cliente: {str(e)}')
 
-        return CreateClient(user=user)
+        return CreateClient(user=user_obj)
 
 
 class UpdateClient(relay.ClientIDMutation):
     user = Field(UserNode)
 
-    class Input(BaseUserInput):
+    class Input:
         id = String(required=True)
         alias = String(required=False)
         phone_number_1 = String(required=False)
@@ -302,6 +326,11 @@ class UpdateClient(relay.ClientIDMutation):
         address_line_2 = String(required=False)
         neighborhood = String(required=False)
         full_name = String(required=False)
+        # New location fields
+        city = String(required=False)
+        address_reference = String(required=False)
+        latitude = graphene.Float(required=False)
+        longitude = graphene.Float(required=False)
 
     @classmethod
     @login_required
@@ -328,7 +357,11 @@ class UpdateClient(relay.ClientIDMutation):
         user_fields = ["phone_number_1", "phone_number_2", "full_name"]
 
         # Fields that belong to ClientProfile model
-        profile_fields = ["alias", "address_line_1", "address_line_2", "neighborhood"]
+        profile_fields = ["alias", "address_line_1", "address_line_2", "neighborhood",
+                         "city", "address_reference"]
+
+        # Special numeric fields
+        numeric_fields = ["latitude", "longitude"]
 
         for field in user_fields:
             value = input.get(field)
@@ -336,6 +369,11 @@ class UpdateClient(relay.ClientIDMutation):
                 setattr(client_user, field, value)
 
         for field in profile_fields:
+            value = input.get(field)
+            if value is not None:
+                setattr(client_user.client_profile, field, value)
+
+        for field in numeric_fields:
             value = input.get(field)
             if value is not None:
                 setattr(client_user.client_profile, field, value)
