@@ -35,6 +35,7 @@ class LoanNode(DjangoObjectType):
         model = Loan
         filter_fields = []
         interfaces = (relay.Node,)
+        exclude_fields = ('interest_rate',)  # Exclude to avoid enum issues for now
 
     def resolve_payments(self, info):
         # Only return non-voided payments by default

@@ -26,7 +26,6 @@ class CreateLoan(relay.ClientIDMutation):
         route_id = String(required=True)
         client_id = String(required=True)
         amount = GrapheneDecimal(required=True)
-        interest_rate = GrapheneDecimal(required=True)
         installments = Int(description="Number of installments (1-90)")
         payment_frequency = String(description="Payment frequency: DAILY, WEEKLY, or MONTHLY")
         due_date = String(description="Due date in YYYY-MM-DD format")
@@ -76,19 +75,15 @@ class CreateLoan(relay.ClientIDMutation):
             raise GraphQLError("El cliente no pertenece a esta ruta")
 
         amount = Decimal(str(input.get('amount')))
-        interest_rate = Decimal(str(input.get('interest_rate')))
         installments = input.get('installments', 1)
         payment_frequency = input.get('payment_frequency', 'WEEKLY')
         due_date = input.get('due_date')
+        # Fixed interest rate at 20%
+        interest_rate = "20"  # String to match the choice value
 
         # Validate amount is positive
         if amount <= Decimal('0.00'):
             raise GraphQLError("El monto debe ser mayor a cero")
-
-        # Validate interest rate is valid (0, 10, or 20)
-        valid_rates = [Decimal('0'), Decimal('10'), Decimal('20')]
-        if interest_rate not in valid_rates:
-            raise GraphQLError("La tasa de interés debe ser 0%, 10% o 20%")
 
         # Validate installments
         if installments < 1 or installments > 90:
@@ -110,7 +105,7 @@ class CreateLoan(relay.ClientIDMutation):
             client=client,
             collector=collector,
             amount=amount,
-            interest_rate=interest_rate,
+            interest_rate=str(interest_rate),  # Convert to string for choices
             installments=installments,
             payment_frequency=payment_frequency,
             due_date=due_date,

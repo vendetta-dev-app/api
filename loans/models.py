@@ -83,7 +83,9 @@ class Loan(models.Model):
 
     @property
     def total_amount(self):
-        return self.amount + ((self.interest_rate / 100) * self.amount)
+        # Convert interest_rate to Decimal if it's stored as string (due to choices)
+        rate = Decimal(self.interest_rate) if isinstance(self.interest_rate, str) else self.interest_rate
+        return self.amount + ((rate / 100) * self.amount)
 
     @property
     def total_paid(self) -> Decimal:

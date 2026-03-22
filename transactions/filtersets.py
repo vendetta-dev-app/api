@@ -12,7 +12,7 @@ class TransactionFilterSet(FilterSet):
 
     class Meta:
         model = Transaction
-        fields = []
+        exclude = ['content_type', 'object_id']  # Exclude generic foreign key fields
 
     def filter_queryset(self, queryset):
         request = self.request
