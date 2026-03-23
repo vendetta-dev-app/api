@@ -17,8 +17,7 @@ from transactions.models import Transaction
 
 class CreateLoan(relay.ClientIDMutation):
     """
-    Creates a new loan request in PENDING status.
-    The loan must be approved by an admin before disbursement.
+    Creates a new loan and disburses it immediately. No approval required.
     """
     loan = Field(LoanNode)
 
@@ -78,8 +77,7 @@ class CreateLoan(relay.ClientIDMutation):
         installments = input.get('installments', 1)
         payment_frequency = input.get('payment_frequency', 'WEEKLY')
         due_date = input.get('due_date')
-        # Fixed interest rate at 20%
-        interest_rate = "20"  # String to match the choice value
+        interest_rate = "20"
 
         # Validate amount is positive
         if amount <= Decimal('0.00'):
@@ -99,153 +97,46 @@ class CreateLoan(relay.ClientIDMutation):
         if not collector:
             raise GraphQLError("La ruta no tiene un cobrador asignado")
 
-        # Create Loan in PENDING status (no transactions yet)
-        loan = Loan.objects.create(
-            route=route,
-            client=client,
-            collector=collector,
-            amount=amount,
-            interest_rate=str(interest_rate),  # Convert to string for choices
-            installments=installments,
-            payment_frequency=payment_frequency,
-            due_date=due_date,
-            is_approved=False  # Requires admin approval
-        )
-
-        return CreateLoan(loan=loan)
-
-
-class ApproveLoan(relay.ClientIDMutation):
-    """
-    Approves a pending loan and creates disbursement transactions.
-    Only admins can approve loans.
-    """
-    loan = Field(LoanNode)
-
-    class Input:
-        loan_id = String(required=True)
-
-    @classmethod
-    @login_required
-    def mutate_and_get_payload(cls, root, info, **input):
-        user = info.context.user
-
-        if not user.is_admin:
-            raise GraphQLError('Solo los administradores pueden aprobar préstamos')
-
-        # Parse loan_id
-        try:
-            loan_id = from_global_id(input.get('loan_id'))[1]
-        except Exception:
-            raise GraphQLError("El id del préstamo no es válido")
-
-        # Get loan
-        try:
-            loan = Loan.objects.select_related(
-                'route', 'client__user', 'route__collector_profile'
-            ).get(id=loan_id)
-        except Loan.DoesNotExist:
-            raise GraphQLError("No existe un préstamo con este id")
-
-        # Validate admin has access to loan's route
-        if not loan.route.administrators.filter(id=user.admin_profile.id).exists():
-            raise GraphQLError("No tienes acceso a este préstamo")
-
-        # Validate loan is not already approved
-        if loan.is_approved:
-            raise GraphQLError("El préstamo ya está aprobado")
-
-        # Validate loan is not rejected
-        if loan.is_rejected:
-            raise GraphQLError("El préstamo fue rechazado y no puede ser aprobado")
-
         # Validate route has sufficient balance
-        if loan.route.current_balance < loan.amount:
-            raise GraphQLError("Balance insuficiente en la ruta")
+        if route.current_balance < amount:
+            raise GraphQLError("Balance insuficiente en la ruta para otorgar este préstamo")
 
         with transaction.atomic():
-            # Update loan status
-            loan.is_approved = True
-            loan.approved_at = timezone.now()
-            loan.approved_by = user
-            loan.save()
-
-            # Create Transaction for disbursement on Route
-            Transaction.objects.create(
-                related_object=loan.route,
-                transaction_type=transaction_types.LOAN_DISBURSEMENT,
-                amount=loan.amount,
-                description=f"Desembolso préstamo #{loan.id} - {loan.client.user.full_name}",
-                maker=user,
-                associated_profile=loan.client.user
+            loan = Loan.objects.create(
+                route=route,
+                client=client,
+                collector=collector,
+                amount=amount,
+                interest_rate=interest_rate,
+                installments=installments,
+                payment_frequency=payment_frequency,
+                due_date=due_date,
+                is_approved=True,
+                approved_at=timezone.now(),
+                approved_by=user,
             )
 
-            # Create Transaction on Loan
+            # Disbursement transaction on the route (reduces balance)
+            Transaction.objects.create(
+                related_object=route,
+                transaction_type=transaction_types.LOAN_DISBURSEMENT,
+                amount=amount,
+                description=f"Desembolso préstamo #{loan.id} - {client.user.full_name}",
+                maker=user,
+                associated_profile=client.user,
+            )
+
+            # Disbursement transaction on the loan (audit trail)
             Transaction.objects.create(
                 related_object=loan,
                 transaction_type=transaction_types.LOAN_DISBURSEMENT,
-                amount=loan.amount,
+                amount=amount,
                 description="Préstamo otorgado",
                 maker=user,
-                associated_profile=loan.client.user
+                associated_profile=client.user,
             )
 
-        return ApproveLoan(loan=loan)
-
-
-class RejectLoan(relay.ClientIDMutation):
-    """
-    Rejects a pending loan request.
-    Only admins can reject loans.
-    """
-    loan = Field(LoanNode)
-
-    class Input:
-        loan_id = String(required=True)
-        reason = String(required=True, description="Reason for rejection")
-
-    @classmethod
-    @login_required
-    def mutate_and_get_payload(cls, root, info, **input):
-        user = info.context.user
-
-        if not user.is_admin:
-            raise GraphQLError('Solo los administradores pueden rechazar préstamos')
-
-        # Parse loan_id
-        try:
-            loan_id = from_global_id(input.get('loan_id'))[1]
-        except Exception:
-            raise GraphQLError("El id del préstamo no es válido")
-
-        reason = input.get('reason', '').strip()
-        if not reason:
-            raise GraphQLError("Debe proporcionar una razón para el rechazo")
-
-        # Get loan
-        try:
-            loan = Loan.objects.select_related('route').get(id=loan_id)
-        except Loan.DoesNotExist:
-            raise GraphQLError("No existe un préstamo con este id")
-
-        # Validate admin has access to loan's route
-        if not loan.route.administrators.filter(id=user.admin_profile.id).exists():
-            raise GraphQLError("No tienes acceso a este préstamo")
-
-        # Validate loan is not already approved
-        if loan.is_approved:
-            raise GraphQLError("No se puede rechazar un préstamo ya aprobado")
-
-        # Validate loan is not already rejected
-        if loan.is_rejected:
-            raise GraphQLError("El préstamo ya fue rechazado")
-
-        # Update loan status
-        loan.is_rejected = True
-        loan.rejection_reason = reason
-        loan.save()
-
-        return RejectLoan(loan=loan)
+        return CreateLoan(loan=loan)
 
 
 class CreatePayment(relay.ClientIDMutation):

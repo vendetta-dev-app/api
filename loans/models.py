@@ -102,11 +102,7 @@ class Loan(models.Model):
 
     @property
     def status(self) -> str:
-        """Estado del préstamo: PENDING, REJECTED, ACTIVE, OVERDUE, PAID"""
-        if self.is_rejected:
-            return "REJECTED"
-        if not self.is_approved:
-            return "PENDING"
+        """Estado del préstamo: ACTIVE, OVERDUE, PAID"""
         if self.pending_balance <= Decimal('0.00'):
             return "PAID"
         if self.is_overdue:
@@ -120,7 +116,7 @@ class Loan(models.Model):
     @property
     def is_overdue(self) -> bool:
         """Returns True if loan is past due date and not fully paid"""
-        if not self.due_date or not self.is_approved:
+        if not self.due_date:
             return False
         if self.is_fully_paid:
             return False

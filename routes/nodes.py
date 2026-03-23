@@ -10,7 +10,7 @@ class RouteNode(DjangoObjectType):
     current_balance = Decimal()
     transactions = List(TransactionNode)
     loans_count = Int()
-    pending_loans_count = Int()
+    overdue_loans_count = Int()
 
     class Meta:
         model = Route
@@ -21,10 +21,11 @@ class RouteNode(DjangoObjectType):
         return self.transactions.select_related('maker', 'associated_profile').all()
 
     def resolve_loans_count(self, info):
-        return self.loans.filter(is_approved=True).count()
+        return self.loans.count()
 
-    def resolve_pending_loans_count(self, info):
-        return self.loans.filter(is_approved=False, is_rejected=False).count()
+    def resolve_overdue_loans_count(self, info):
+        from django.utils import timezone
+        return self.loans.filter(due_date__lt=timezone.now().date()).count()
 
     @classmethod
     def get_queryset(cls, queryset, info):
