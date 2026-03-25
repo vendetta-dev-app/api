@@ -23,6 +23,7 @@ class LoanNode(DjangoObjectType):
     total_amount = Decimal()
     total_paid = Decimal()
     pending_balance = Decimal()
+    installment_amount = Decimal()
     status = String()
     is_fully_paid = Boolean()
     is_overdue = Boolean()
