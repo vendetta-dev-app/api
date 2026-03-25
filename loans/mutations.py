@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
-from graphene import relay, Field, String, Decimal as GrapheneDecimal, Int
+from graphene import relay, Field, String, Decimal as GrapheneDecimal, Int, DateTime
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
@@ -10,6 +10,7 @@ from graphql_relay import from_global_id
 from accounts.models import ClientProfile
 from loans.models import Loan, Payment
 from loans.nodes import LoanNode, PaymentNode
+from loans.enums import PaymentMethodType
 from routes.models import Route
 from transactions.constants import transaction_types
 from transactions.models import Transaction
@@ -146,76 +147,86 @@ class CreatePayment(relay.ClientIDMutation):
     class Input:
         loan_id = String(required=True)
         amount = GrapheneDecimal(required=True)
-        payment_date = String(required=True)
-        payment_method = String(required=True)
+        payment_date = DateTime(required=True)
+        payment_method = PaymentMethodType(required=True)
         notes = String()
+
+    @staticmethod
+    def user_has_access(user, loan):
+        if user.is_admin:
+            return loan.route.administrators.filter(
+                id=user.admin_profile.id
+            ).exists()
+
+        if user.is_collector:
+            return loan.route.collector_profile == user.collector_profile
+
+        return False
 
     @classmethod
     @login_required
     def mutate_and_get_payload(cls, root, info, **input):
         user = info.context.user
 
-        if not user.is_admin and not user.is_collector:
-            raise GraphQLError('No tienes permisos para realizar esta acción')
+        if not (user.is_admin or user.is_collector):
+            raise GraphQLError("No tienes permisos para realizar esta acción")
 
-        # Parse loan_id
         try:
-            loan_id = from_global_id(input.get('loan_id'))[1]
+            loan_id = from_global_id(input.get("loan_id"))[1]
         except Exception:
             raise GraphQLError("El id del préstamo no es válido")
 
-        # Get loan
         try:
             loan = Loan.objects.select_related(
-                'route', 'client__user', 'route__collector_profile'
+                "route",
+                "client__user",
+                "route__collector_profile"
             ).get(id=loan_id)
         except Loan.DoesNotExist:
             raise GraphQLError("No existe un préstamo con este id")
 
-        # Validate user has access to loan's route
-        if user.is_admin:
-            if not loan.route.administrators.filter(id=user.admin_profile.id).exists():
-                raise GraphQLError("No tienes acceso a este préstamo")
-        elif user.is_collector:
-            if loan.route.collector_profile != user.collector_profile:
-                raise GraphQLError("No tienes acceso a este préstamo")
+        if not cls.user_has_access(user, loan):
+            raise GraphQLError("No tienes acceso a este préstamo")
 
-        # Validate loan is approved
         if not loan.is_approved:
             raise GraphQLError("El préstamo no está aprobado")
 
-        amount = Decimal(str(input.get('amount')))
-        payment_date = input.get('payment_date')
-        payment_method = input.get('payment_method')
-        notes = input.get('notes', '')
+        amount = input.get("amount")
+        payment_date = input.get("payment_date")
+        payment_method = input.get("payment_method")
+        notes = input.get("notes", "")
 
-        # Validate amount is positive
-        if amount <= Decimal('0.00'):
+        if timezone.is_naive(payment_date):
+            payment_date = timezone.make_aware(payment_date)
+
+        if amount is None:
+            raise GraphQLError("El monto es requerido")
+
+        amount = Decimal(amount)
+
+        if amount <= Decimal("0.00"):
             raise GraphQLError("El monto debe ser mayor a cero")
 
-        # Validate payment method
-        valid_methods = ['CASH', 'TRANSFER', 'OTHER']
-        if payment_method not in valid_methods:
-            raise GraphQLError("Método de pago no válido. Use: CASH, TRANSFER u OTHER")
-
-        # Calculate pending balance
         pending = loan.pending_balance
 
-        # Validate amount doesn't exceed pending balance
         if amount > pending:
-            raise GraphQLError(f"El monto ({amount}) excede el saldo pendiente ({pending})")
+            raise GraphQLError(
+                f"El monto ({amount}) excede el saldo pendiente ({pending})"
+            )
+
+        if payment_date > timezone.now():
+            raise GraphQLError("La fecha de pago no puede ser futura")
 
         with transaction.atomic():
-            # Create Payment
             payment = Payment.objects.create(
                 loan=loan,
                 amount=amount,
                 payment_date=payment_date,
-                payment_method=payment_method,
+                payment_method=payment_method.value,  # 👈 importante con Enum
                 notes=notes
             )
 
-            # Create Transaction associated with Payment (payment audit)
+            # 🧾 Auditoría del pago
             Transaction.objects.create(
                 related_object=payment,
                 transaction_type=transaction_types.LOAN_PAYMENT,
@@ -225,17 +236,19 @@ class CreatePayment(relay.ClientIDMutation):
                 associated_profile=loan.client.user
             )
 
-            # Create Transaction on Route (updates cash balance)
+            # 💰 Impacto en caja/ruta
             Transaction.objects.create(
                 related_object=loan.route,
                 transaction_type=transaction_types.LOAN_PAYMENT,
                 amount=amount,
-                description=f"Pago recibido - Préstamo #{loan.id} - {loan.client.user.full_name}",
+                description=(
+                    f"Pago recibido - Préstamo #{loan.id} - "
+                    f"{loan.client.user.full_name}"
+                ),
                 maker=user,
                 associated_profile=loan.client.user
             )
 
-        # Refresh loan to get updated calculated properties
         loan.refresh_from_db()
 
         return CreatePayment(payment=payment, loan=loan)

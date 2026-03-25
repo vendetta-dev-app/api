@@ -149,7 +149,7 @@ class Payment(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))]
     )
-    payment_date = models.DateField()
+    payment_date = models.DateTimeField(default=timezone.now)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
     notes = models.TextField(blank=True)
 
