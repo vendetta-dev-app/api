@@ -1,10 +1,10 @@
-from graphene import relay, Field, String, Boolean
 import graphene
+from graphene import relay, Field, String, Boolean
 from graphql import GraphQLError
 from graphql_jwt.decorators import login_required
 from graphql_relay import from_global_id
 
-from accounts.models import InvitationCode, User, CollectorProfile
+from accounts.models import ClientProfile, InvitationCode, User, CollectorProfile
 from routes.models import Route
 from accounts.nodes import UserNode, CollectorNode, ManagerNode
 
@@ -385,3 +385,51 @@ class UpdateClient(relay.ClientIDMutation):
             raise GraphQLError(f"Error actualizando cliente: {str(e)}")
 
         return UpdateClient(user=client_user)
+
+
+class ClientOrderInput(graphene.InputObjectType):
+    client_id = String(required=True)
+    order = graphene.Int(required=True)
+
+
+class ReorderRouteClients(relay.ClientIDMutation):
+    success = Boolean()
+
+    class Input:
+        client_orders = graphene.List(ClientOrderInput, required=True)
+
+    @classmethod
+    @login_required
+    def mutate_and_get_payload(cls, root, info, **input):
+        user = info.context.user
+
+        if not user.is_collector:
+            raise GraphQLError("Solo los cobradores pueden reordenar sus clientes")
+
+        collector_route = user.collector_profile.route
+        if not collector_route:
+            raise GraphQLError("No tienes una ruta asignada")
+
+        client_orders = input.get('client_orders', [])
+
+        client_ids = []
+        order_map = {}
+        for item in client_orders:
+            try:
+                pk = int(from_global_id(item.client_id)[1])
+            except Exception:
+                raise GraphQLError(f"ID de cliente inválido: {item.client_id}")
+            client_ids.append(pk)
+            order_map[pk] = item.order
+
+        clients = list(ClientProfile.objects.filter(id__in=client_ids, route=collector_route))
+
+        if len(clients) != len(client_ids):
+            raise GraphQLError("Algunos clientes no pertenecen a tu ruta")
+
+        for client in clients:
+            client.visit_order = order_map[client.id]
+
+        ClientProfile.objects.bulk_update(clients, ['visit_order'])
+
+        return ReorderRouteClients(success=True)

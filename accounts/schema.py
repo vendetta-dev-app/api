@@ -1,6 +1,7 @@
 import graphql_jwt
 from django.contrib.auth.models import update_last_login
-from graphene import ObjectType, Field, String, ID
+from django.db.models import F
+from graphene import ObjectType, Field, List, String, ID
 from graphene_django.filter import DjangoFilterConnectionField
 from graphql import GraphQLError
 from graphql_jwt import Verify, Refresh
@@ -9,7 +10,7 @@ from graphql_relay import from_global_id
 
 from accounts.filtersets import CollectorProfileFilterset, ManagerProfileFilterset
 from accounts.models import CollectorProfile, ManagerProfile, ClientProfile
-from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, UpdateCollector, CreateManager, UpdateManager, UpdateClient
+from accounts.mutations import CreateAdmin, CreateCollector, CreateClient, UpdateCollector, CreateManager, UpdateManager, UpdateClient, ReorderRouteClients
 from accounts.nodes import UserNode, CollectorNode, ManagerNode, ClientNode
 
 
@@ -23,6 +24,8 @@ class Query(ObjectType):
     clients_by_admin = DjangoFilterConnectionField(ClientNode)
 
     clients_by_collector = DjangoFilterConnectionField(ClientNode)
+
+    today_visits = List(ClientNode)
 
     client = Field(ClientNode, id=ID(required=True))
 
@@ -76,7 +79,33 @@ class Query(ObjectType):
 
         return ClientProfile.objects.filter(
             route=user.collector_profile.route
-        ).select_related('user')
+        ).select_related('user').order_by(
+            F('visit_order').asc(nulls_last=True),
+            'user__full_name'
+        )
+
+    @login_required
+    def resolve_today_visits(self, info, **kwargs):
+        user = info.context.user
+
+        if not user.is_collector:
+            raise GraphQLError("Solo los cobradores pueden ver sus visitas de hoy")
+
+        collector_route = user.collector_profile.route
+        if not collector_route:
+            return []
+
+        clients = ClientProfile.objects.filter(
+            route=collector_route
+        ).select_related('user').prefetch_related('loans__payments').order_by(
+            F('visit_order').asc(nulls_last=True),
+            'user__full_name'
+        )
+
+        return [
+            client for client in clients
+            if any(loan.should_visit_today for loan in client.loans.all())
+        ]
 
     @login_required
     def resolve_client(self, info, id, **kwargs):
@@ -127,3 +156,4 @@ class Mutation(ObjectType):
     update_collector = UpdateCollector.Field()
     create_client = CreateClient.Field()
     update_client = UpdateClient.Field()
+    reorder_route_clients = ReorderRouteClients.Field()

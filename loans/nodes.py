@@ -1,4 +1,4 @@
-from graphene import relay, Decimal, String, Boolean, List, Int
+from graphene import relay, Date, Decimal, String, Boolean, List, Int
 from graphene_django import DjangoObjectType
 
 from accounts.nodes import UserNode
@@ -24,6 +24,11 @@ class LoanNode(DjangoObjectType):
     total_paid = Decimal()
     pending_balance = Decimal()
     installment_amount = Decimal()
+    installments_completed = Int()
+    installments_due = Int()
+    payment_status = String()
+    should_visit_today = Boolean()
+    next_visit_date = Date()
     status = String()
     is_fully_paid = Boolean()
     is_overdue = Boolean()

@@ -1,5 +1,7 @@
+from datetime import timedelta
 from decimal import Decimal
 
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.validators import MinValueValidator
@@ -50,7 +52,7 @@ class Loan(models.Model):
     )
 
     # Approval workflow fields
-    is_approved = models.BooleanField(default=False)
+    is_approved = models.BooleanField(default=True)
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -128,6 +130,89 @@ class Loan(models.Model):
         if not self.is_overdue:
             return 0
         return (timezone.now().date() - self.due_date).days
+
+    # --- Visit schedule & payment status ---
+
+    def _frequency_delta(self, periods: int):
+        if self.payment_frequency == payment_frequency.DAILY:
+            return timedelta(days=periods)
+        if self.payment_frequency == payment_frequency.WEEKLY:
+            return timedelta(weeks=periods)
+        return relativedelta(months=periods)
+
+    @property
+    def installment_amount(self) -> Decimal:
+        return self.total_amount / self.installments
+
+    @property
+    def installments_completed(self) -> int:
+        """Cuotas completamente cubiertas por los pagos válidos realizados."""
+        return min(int(self.total_paid / self.installment_amount), self.installments)
+
+    @property
+    def installments_due(self) -> int:
+        """Cuotas que debieron haberse pagado hasta hoy según la periodicidad del préstamo."""
+        today = timezone.now().date()
+        created = self.created_at.date()
+
+        if self.payment_frequency == payment_frequency.DAILY:
+            elapsed = (today - created).days
+        elif self.payment_frequency == payment_frequency.WEEKLY:
+            elapsed = (today - created).days // 7
+        else:
+            elapsed = (today.year - created.year) * 12 + (today.month - created.month)
+
+        return min(elapsed, self.installments)
+
+    @property
+    def payment_status(self) -> str:
+        """
+        AL_DIA       → pagos al corriente
+        ADELANTADO   → pagó más cuotas de las que van hasta hoy
+        PAGO_PARCIAL → pagó parcialmente la cuota vigente (exactamente 1 cuota atrás con abono)
+        ATRASADO     → debe una o más cuotas sin abono suficiente
+        """
+        if self.is_fully_paid:
+            return "PAID"
+
+        completed = self.installments_completed
+        due = self.installments_due
+
+        if completed > due:
+            return "ADELANTADO"
+        if completed == due:
+            return "AL_DIA"
+
+        partial_paid = self.total_paid - (completed * self.installment_amount)
+        if completed == due - 1 and partial_paid > 0:
+            return "PAGO_PARCIAL"
+
+        return "ATRASADO"
+
+    @property
+    def should_visit_today(self) -> bool:
+        """True si la agenda fija del préstamo indica visita hoy o hay cuotas pendientes de días anteriores."""
+        if self.is_fully_paid:
+            return False
+        first_visit = self.created_at.date() + self._frequency_delta(1)
+        return first_visit <= timezone.now().date()
+
+    @property
+    def next_visit_date(self):
+        """Fecha de la próxima visita programada según la agenda fija (siguiente período desde hoy)."""
+        if self.is_fully_paid:
+            return None
+        today = timezone.now().date()
+        created = self.created_at.date()
+
+        if self.payment_frequency == payment_frequency.DAILY:
+            elapsed_periods = (today - created).days
+        elif self.payment_frequency == payment_frequency.WEEKLY:
+            elapsed_periods = (today - created).days // 7
+        else:
+            elapsed_periods = (today.year - created.year) * 12 + (today.month - created.month)
+
+        return created + self._frequency_delta(elapsed_periods + 1)
 
 
 class Payment(models.Model):

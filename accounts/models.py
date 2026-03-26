@@ -100,6 +100,8 @@ class ClientProfile(ProfileBase):
         related_name='clients'
     )
 
+    visit_order = models.PositiveIntegerField(null=True, blank=True)
+
     is_active = models.BooleanField(default=False)
 
     class Meta:

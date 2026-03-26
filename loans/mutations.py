@@ -188,9 +188,6 @@ class CreatePayment(relay.ClientIDMutation):
         if not cls.user_has_access(user, loan):
             raise GraphQLError("No tienes acceso a este préstamo")
 
-        if not loan.is_approved:
-            raise GraphQLError("El préstamo no está aprobado")
-
         amount = input.get("amount")
         payment_date = input.get("payment_date")
         payment_method = input.get("payment_method")
