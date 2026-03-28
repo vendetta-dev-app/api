@@ -31,8 +31,8 @@ def make_collector(admin, suffix=''):
     return CollectorProfile.objects.create(user=user, admin=admin)
 
 
-def make_manager(admin):
-    user = make_user('manager_routes@test.com', role='MANAGER')
+def make_manager(admin, suffix=''):
+    user = make_user(f'manager_routes{suffix}@test.com', role='MANAGER')
     return ManagerProfile.objects.create(user=user, admin=admin)
 
 
@@ -109,3 +109,65 @@ class CreateRouteCollectorValidationTest(TestCase):
         self.assertIsNotNone(result.route)
         self.collector_free.refresh_from_db()
         self.assertEqual(self.collector_free.route, result.route)
+
+
+class EditRouteCollectorValidationTest(TestCase):
+    def setUp(self):
+        country, _ = Country.objects.get_or_create(name='Test Country', defaults={'continent': 'SA'})
+        self.city, _ = City.objects.get_or_create(name='Test City', defaults={'country': country})
+        self.admin = make_admin()
+        self.manager = make_manager(self.admin, suffix='_edit')
+
+        self.route = make_route(self.city, name='Route To Edit')
+        self.route.administrators.set([self.admin])
+        self.current_collector = make_collector(self.admin, suffix='_current')
+        self.current_collector.route = self.route
+        self.current_collector.save()
+
+        self.other_route = make_route(self.city, name='Other Route')
+        self.busy_collector = make_collector(self.admin, suffix='_busy2')
+        self.busy_collector.route = self.other_route
+        self.busy_collector.save()
+
+        self.free_collector = make_collector(self.admin, suffix='_free2')
+        self.info = mock_admin_info(self.admin.user)
+
+    def test_raises_error_when_new_collector_has_different_route(self):
+        with self.assertRaises(GraphQLError) as ctx:
+            EditRoute.mutate_and_get_payload(
+                None, self.info,
+                route_id=gid('RouteNode', self.route.id),
+                collector_id=gid('CollectorNode', self.busy_collector.id),
+                manager_id=gid('ManagerNode', self.manager.id),
+            )
+        self.assertEqual(str(ctx.exception), 'El cobrador ya tiene otra ruta asignada')
+
+    def test_succeeds_with_free_collector(self):
+        result = EditRoute.mutate_and_get_payload(
+            None, self.info,
+            route_id=gid('RouteNode', self.route.id),
+            collector_id=gid('CollectorNode', self.free_collector.id),
+            manager_id=gid('ManagerNode', self.manager.id),
+        )
+        self.assertIsNotNone(result.route)
+        self.free_collector.refresh_from_db()
+        self.assertEqual(self.free_collector.route, self.route)
+
+    def test_old_collector_unlinked_when_replaced(self):
+        EditRoute.mutate_and_get_payload(
+            None, self.info,
+            route_id=gid('RouteNode', self.route.id),
+            collector_id=gid('CollectorNode', self.free_collector.id),
+            manager_id=gid('ManagerNode', self.manager.id),
+        )
+        self.current_collector.refresh_from_db()
+        self.assertIsNone(self.current_collector.route)
+
+    def test_succeeds_reassigning_same_collector(self):
+        result = EditRoute.mutate_and_get_payload(
+            None, self.info,
+            route_id=gid('RouteNode', self.route.id),
+            collector_id=gid('CollectorNode', self.current_collector.id),
+            manager_id=gid('ManagerNode', self.manager.id),
+        )
+        self.assertIsNotNone(result.route)

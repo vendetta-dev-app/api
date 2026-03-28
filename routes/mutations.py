@@ -47,15 +47,15 @@ class CreateRoute(relay.ClientIDMutation):
 
         admin_profile = user.admin_profile
 
-        try:
-            collector = CollectorProfile.objects.get(id=collector_id)
-        except CollectorProfile.DoesNotExist:
-            raise GraphQLError("No existe un cobrador con este id")
-
-        if collector.route is not None:
-            raise GraphQLError("El cobrador ya tiene una ruta asignada")
-
         with transaction.atomic():
+            try:
+                collector = CollectorProfile.objects.select_for_update().get(id=collector_id)
+            except CollectorProfile.DoesNotExist:
+                raise GraphQLError("No existe un cobrador con este id")
+
+            if collector.route is not None:
+                raise GraphQLError("El cobrador ya tiene una ruta asignada")
+
             route = Route.objects.create(
                 name=input.get('name'),
                 city_id=city_id,
@@ -112,28 +112,29 @@ class EditRoute(ClientIDMutation):
             raise GraphQLError("No existe una ruta con este id")
 
         try:
-            collector = CollectorProfile.objects.get(id=collector_id)
-        except CollectorProfile.DoesNotExist:
-            raise GraphQLError("No existe un cobrador con este id")
-
-        try:
             manager = ManagerProfile.objects.get(id=manager_id)
         except ManagerProfile.DoesNotExist:
             raise GraphQLError("No existe un manager con este id")
 
-        if collector.route is not None and collector.route.id != route.id:
-            raise GraphQLError("El cobrador ya tiene otra ruta asignada")
+        with transaction.atomic():
+            try:
+                collector = CollectorProfile.objects.select_for_update().get(id=collector_id)
+            except CollectorProfile.DoesNotExist:
+                raise GraphQLError("No existe un cobrador con este id")
 
-        route.manager = manager
-        route.save()
+            if collector.route is not None and collector.route.id != route.id:
+                raise GraphQLError("El cobrador ya tiene otra ruta asignada")
 
-        current_collector = CollectorProfile.objects.filter(route=route).first()
-        if current_collector and current_collector != collector:
-            current_collector.route = None
-            current_collector.save()
+            route.manager = manager
+            route.save()
 
-        collector.route = route
-        collector.save()
+            current_collector = CollectorProfile.objects.filter(route=route).select_for_update().first()
+            if current_collector and current_collector != collector:
+                current_collector.route = None
+                current_collector.save()
+
+            collector.route = route
+            collector.save()
 
         return EditRoute(route=route)
 
