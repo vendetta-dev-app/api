@@ -47,6 +47,14 @@ class CreateRoute(relay.ClientIDMutation):
 
         admin_profile = user.admin_profile
 
+        try:
+            collector = CollectorProfile.objects.get(id=collector_id)
+        except CollectorProfile.DoesNotExist:
+            raise GraphQLError("No existe un cobrador con este id")
+
+        if collector.route is not None:
+            raise GraphQLError("El cobrador ya tiene una ruta asignada")
+
         with transaction.atomic():
             route = Route.objects.create(
                 name=input.get('name'),
@@ -55,8 +63,6 @@ class CreateRoute(relay.ClientIDMutation):
             )
             route.administrators.set([admin_profile])
 
-            # Asignar la ruta al collector
-            collector = CollectorProfile.objects.get(id=collector_id)
             collector.route = route
             collector.save()
 
@@ -113,17 +119,19 @@ class EditRoute(ClientIDMutation):
         try:
             manager = ManagerProfile.objects.get(id=manager_id)
         except ManagerProfile.DoesNotExist:
-            raise GraphQLError("No existe un cobrador con este id")
+            raise GraphQLError("No existe un manager con este id")
+
+        if collector.route is not None and collector.route.id != route.id:
+            raise GraphQLError("El cobrador ya tiene otra ruta asignada")
 
         route.manager = manager
         route.save()
 
-        # Actualizar la ruta del collector (verificar que no tenga otra)
-        current_collector = route.collector_profile
+        current_collector = CollectorProfile.objects.filter(route=route).first()
         if current_collector and current_collector != collector:
-            # La ruta ya tiene otro collector asignado
             current_collector.route = None
             current_collector.save()
+
         collector.route = route
         collector.save()
 
@@ -170,8 +178,3 @@ class AddAdminToRoute(relay.ClientIDMutation):
         route.administrators.add(admin_profile)
 
         return AddAdminToRoute(route=route)
-
-
-
-
-
