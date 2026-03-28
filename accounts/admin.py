@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.contrib.auth.forms import ReadOnlyPasswordHashField, AdminPasswordChangeForm
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
+from unfold.admin import ModelAdmin, StackedInline
 
 from accounts.models import User, ClientProfile, CollectorProfile, AdminProfile, InvitationCode
 
@@ -65,25 +66,29 @@ class UserChangeForm(forms.ModelForm):
         return self.initial["password"]
 
 
-class ClientProfileAdmin(admin.StackedInline):
+class ClientProfileAdmin(StackedInline):
     model = ClientProfile
     can_delete = False
-    verbose_name_plural = 'Client profile'
+    verbose_name_plural = 'Client Profile'
+    fields = ('alias', 'identity_document', 'address_line_1', 'neighborhood', 'city', 'route', 'is_active', 'visit_order')
+    readonly_fields = ('route',)
 
 
-class CollectorProfileAdmin(admin.StackedInline):
+class CollectorProfileAdmin(StackedInline):
     model = CollectorProfile
     can_delete = False
-    verbose_name_plural = 'Collector profile'
+    verbose_name_plural = 'Collector Profile'
+    fields = ('admin', 'route', 'is_active')
+    readonly_fields = ('route',)
 
 
-class AdminProfileAdmin(admin.StackedInline):
+class AdminProfileAdmin(StackedInline):
     model = AdminProfile
     can_delete = False
-    verbose_name_plural = 'Admin profile'
+    verbose_name_plural = 'Admin Profile'
 
 
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(ModelAdmin, BaseUserAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
@@ -113,6 +118,6 @@ admin.site.register(User, UserAdmin)
 admin.site.unregister(Group)
 
 @admin.register(InvitationCode)
-class InvitationCodeAdmin(admin.ModelAdmin):
+class InvitationCodeAdmin(ModelAdmin):
     list_display = ('code', 'is_active', 'used_by', 'created_at')
     readonly_fields = ('used_at',)

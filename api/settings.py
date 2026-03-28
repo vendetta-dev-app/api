@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 from pathlib import Path
+from django.urls import reverse_lazy
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +41,8 @@ if os.environ.get("CSRF_TRUSTED_ORIGINS", None):
 # Application definition
 
 INSTALLED_APPS = [
+    'unfold',
+    'unfold.contrib.filters',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -164,4 +167,76 @@ SHELL_PLUS = "ipython"
 #CITIES LIGHT
 
 CITIES_LIGHT_INCLUDE_COUNTRIES = ['CL']
+
+UNFOLD = {
+    "SITE_TITLE": "Vendetta",
+    "SITE_HEADER": "Vendetta Admin",
+    "NAVIGATION": [
+        {
+            "title": "Users",
+            "items": [
+                {
+                    "title": "Users",
+                    "icon": "people",
+                    "link": reverse_lazy("admin:accounts_user_changelist"),
+                },
+                {
+                    "title": "Invitation Codes",
+                    "icon": "key",
+                    "link": reverse_lazy("admin:accounts_invitationcode_changelist"),
+                },
+            ],
+        },
+        {
+            "title": "Routes",
+            "items": [
+                {
+                    "title": "Routes",
+                    "icon": "map",
+                    "link": reverse_lazy("admin:routes_route_changelist"),
+                },
+            ],
+        },
+        {
+            "title": "Loans",
+            "items": [
+                {
+                    "title": "Loans",
+                    "icon": "request_quote",
+                    "link": reverse_lazy("admin:loans_loan_changelist"),
+                },
+                {
+                    "title": "Payments",
+                    "icon": "receipt_long",
+                    "link": reverse_lazy("admin:loans_payment_changelist"),
+                },
+            ],
+        },
+        {
+            "title": "Audit",
+            "items": [
+                {
+                    "title": "Transactions",
+                    "icon": "history",
+                    "link": reverse_lazy("admin:transactions_transaction_changelist"),
+                },
+            ],
+        },
+    ],
+    "COLORS": {
+        "primary": {
+            "50": "243 248 232",
+            "100": "228 240 206",
+            "200": "198 224 156",
+            "300": "159 201 94",
+            "400": "120 174 42",
+            "500": "90 138 24",
+            "600": "53 83 14",
+            "700": "41 66 9",
+            "800": "30 48 7",
+            "900": "19 31 4",
+            "950": "10 17 2",
+        },
+    },
+}
 
